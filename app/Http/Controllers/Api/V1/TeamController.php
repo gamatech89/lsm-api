@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
@@ -148,6 +149,8 @@ class TeamController extends Controller
      */
     public function destroy(User $user): JsonResponse
     {
+        Gate::authorize('delete', $user);
+
         // Prevent deleting yourself
         if ($user->id === auth()->id()) {
             return $this->errorResponse('You cannot delete your own account', 400);
