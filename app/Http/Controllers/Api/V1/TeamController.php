@@ -195,13 +195,19 @@ class TeamController extends Controller
      */
     public function sendPasswordResetLink(User $user): JsonResponse
     {
-        $status = PasswordBroker::sendResetLink(['email' => $user->email]);
+        try {
+            $status = PasswordBroker::sendResetLink(['email' => $user->email]);
 
-        if ($status === PasswordBroker::RESET_LINK_SENT) {
-            return $this->successResponse(null, 'Password reset link sent to ' . $user->email);
+            if ($status === PasswordBroker::RESET_LINK_SENT) {
+                return $this->successResponse(null, 'Password reset link sent to ' . $user->email);
+            }
+
+            \Log::warning('Password reset link failed', ['status' => $status, 'email' => $user->email]);
+            return $this->errorResponse('Failed to send reset link: ' . __($status), 500);
+        } catch (\Exception $e) {
+            \Log::error('Password reset link exception', ['error' => $e->getMessage(), 'email' => $user->email]);
+            return $this->errorResponse('Failed to send reset link: ' . $e->getMessage(), 500);
         }
-
-        return $this->errorResponse('Failed to send reset link. Please try again.', 500);
     }
 
     /**
