@@ -1,0 +1,3 @@
+project_external_id,name,domain,hacked,pm,developer,hosting_provider,hosting_url,username,password,ssh_access,drive_link,trello_link,notes
+WV10001,Example Project,example-project.de,Nein,Vinzent,,Raidboxes,https://dashboard.raidboxes.de/login,,,,,
+LP10002,Sample Website,sample-website.com,Nein,Daniel,Bojan,IONOS,https://login.ionos.de/,,,,,
