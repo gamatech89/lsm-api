@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Validation\Rules\Password;
 
 /**
@@ -75,7 +76,7 @@ class TeamController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => ['required', Password::defaults()],
+            'password' => ['required', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => 'required|in:admin,manager,developer,viewer',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'exists:tags,id',
@@ -114,7 +115,7 @@ class TeamController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
-            'password' => ['sometimes', 'nullable', Password::defaults()],
+            'password' => ['sometimes', 'nullable', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => 'sometimes|required|in:admin,manager,developer,viewer',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'exists:tags,id',
@@ -164,6 +165,43 @@ class TeamController extends Controller
         $user->delete();
 
         return $this->successResponse(null, 'Team member deleted successfully');
+    }
+
+    /**
+     * Reset password for a team member (admin sets new password).
+     *
+     * @param Request $request
+     * @param User $user
+     * @return JsonResponse
+     */
+    public function resetPassword(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => ['required', Password::min(8)->mixedCase()->numbers()->symbols()],
+        ]);
+
+        $user->update([
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        return $this->successResponse(null, 'Password reset successfully');
+    }
+
+    /**
+     * Send password reset link to a team member's email.
+     *
+     * @param User $user
+     * @return JsonResponse
+     */
+    public function sendPasswordResetLink(User $user): JsonResponse
+    {
+        $status = PasswordBroker::sendResetLink(['email' => $user->email]);
+
+        if ($status === PasswordBroker::RESET_LINK_SENT) {
+            return $this->successResponse(null, 'Password reset link sent to ' . $user->email);
+        }
+
+        return $this->errorResponse('Failed to send reset link. Please try again.', 500);
     }
 
     /**

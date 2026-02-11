@@ -268,6 +268,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/team', [V1\TeamController::class, 'store'])->name('team.store');
             Route::put('/team/{user}', [V1\TeamController::class, 'update'])->name('team.update');
             Route::delete('/team/{user}', [V1\TeamController::class, 'destroy'])->name('team.destroy');
+            Route::post('/team/{user}/reset-password', [V1\TeamController::class, 'resetPassword'])->name('team.reset-password');
+            Route::post('/team/{user}/send-reset-link', [V1\TeamController::class, 'sendPasswordResetLink'])->name('team.send-reset-link');
         });
 
         // -------------------------------------------------
