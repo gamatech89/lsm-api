@@ -109,7 +109,10 @@ class TimesheetPolicy
     private function managesUserProjects(User $manager, int $userId): bool
     {
         // Get projects this manager manages
-        $projectIds = \App\Models\Project::where('manager_id', $manager->id)->pluck('id');
+        $projectIds = \App\Models\Project::where(function($q) use ($manager) {
+            $q->where('manager_id', $manager->id)
+              ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $manager->id));
+        })->pluck('id');
         
         // Check if the user has time entries on those projects
         return \App\Models\TimeEntry::whereIn('project_id', $projectIds)

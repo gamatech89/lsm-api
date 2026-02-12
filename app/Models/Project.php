@@ -104,6 +104,7 @@ class Project extends Model
             $project->todos()->delete();
             $project->tags()->detach();
             $project->developers()->detach();
+            $project->managers()->detach();
         });
 
         static::deleted(function () {
@@ -124,11 +125,20 @@ class Project extends Model
     }
 
     /**
-     * Get the manager of the project.
+     * Get the manager of the project (legacy single manager).
      */
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    /**
+     * Get all managers assigned to the project.
+     */
+    public function managers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'project_manager')
+            ->withTimestamps();
     }
 
     /**

@@ -22,6 +22,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::post('/login', [V1\AuthController::class, 'login'])
         ->middleware('throttle:5,1')
         ->name('login');
+
+    Route::post('/reset-password', [V1\AuthController::class, 'resetPassword'])
+        ->middleware('throttle:5,1')
+        ->name('password.reset');
     
     // Public credential share verification (if needed for mobile)
     // Route::post('/share/credential/{token}/verify', [V1\CredentialShareController::class, 'verify']);

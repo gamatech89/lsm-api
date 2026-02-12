@@ -53,7 +53,7 @@ class ProjectPolicy
     public function update(User $user, Project $project): bool
     {
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         if ($user->role === 'developer') {
@@ -72,7 +72,7 @@ class ProjectPolicy
     public function delete(User $user, Project $project): bool
     {
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         return false;
@@ -83,7 +83,7 @@ class ProjectPolicy
      */
     public function restore(User $user, Project $project): bool
     {
-        return $user->role === 'manager' && $project->manager_id === $user->id;
+        return $user->role === 'manager' && $project->managers->contains('id', $user->id);
     }
 
     /**
@@ -101,7 +101,7 @@ class ProjectPolicy
     public function manageCredentials(User $user, Project $project): bool
     {
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         if ($user->role === 'developer') {
@@ -118,6 +118,6 @@ class ProjectPolicy
      */
     public function assignTeam(User $user, Project $project): bool
     {
-        return $user->role === 'manager' && $project->manager_id === $user->id;
+        return $user->role === 'manager' && $project->managers->contains('id', $user->id);
     }
 }

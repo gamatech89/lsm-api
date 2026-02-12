@@ -327,7 +327,11 @@ class CheckSiteUptime extends Command
 
         // Collect team members
         $members = collect();
-        if ($project->manager_id) {
+        foreach ($project->managers as $manager) {
+            $members->push($manager);
+        }
+        // Fallback: legacy manager_id
+        if ($members->isEmpty() && $project->manager_id) {
             $members->push(User::find($project->manager_id));
         }
         if ($project->developer_id) {

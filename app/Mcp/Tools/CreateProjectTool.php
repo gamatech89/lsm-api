@@ -75,6 +75,10 @@ class CreateProjectTool extends Tool
             'security_status' => 'secure',
             'created_by' => $user->id,
         ]);
+        // Sync manager to pivot table
+        if ($managerId) {
+            $project->managers()->sync([$managerId]);
+        }
 
         $managerName = $managerId ? User::find($managerId)->name : 'Unassigned';
 

@@ -85,10 +85,15 @@ class BulkAssignDevelopersTool extends Tool
             }
 
             if (in_array($target, ['manager', 'both'])) {
+                $managerCount = $project->managers->count();
+                if ($managerCount > 0) {
+                    $project->managers()->detach();
+                    $clearedManagers += $managerCount;
+                }
                 if ($project->manager_id) {
                     $project->manager_id = null;
                     $project->save();
-                    $clearedManagers++;
+                    if ($managerCount === 0) $clearedManagers++;
                 }
             }
         }

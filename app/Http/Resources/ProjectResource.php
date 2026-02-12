@@ -63,6 +63,7 @@ class ProjectResource extends JsonResource
             // Relationships (conditionally loaded)
             'manager_id' => $this->manager_id,
             'manager' => new UserResource($this->whenLoaded('manager')),
+            'managers' => UserResource::collection($this->whenLoaded('managers')),
             'developer_id' => $this->developer_id,
             'developer' => new UserResource($this->whenLoaded('developer')),
             'developers' => UserResource::collection($this->whenLoaded('developers')),

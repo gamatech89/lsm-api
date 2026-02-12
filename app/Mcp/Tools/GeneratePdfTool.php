@@ -150,7 +150,7 @@ class GeneratePdfTool extends Tool
             case 'missing_manager':
             case 'no_manager':
             case 'no_pm':
-                $query->whereNull('manager_id');
+                $query->whereNull('manager_id')->whereDoesntHave('managers');
                 break;
             case 'at_risk':
             case 'at-risk':

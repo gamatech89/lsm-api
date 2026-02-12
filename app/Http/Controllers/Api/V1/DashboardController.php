@@ -87,7 +87,15 @@ class DashboardController extends Controller
                       ->where('project_developer.user_id', $user->id);
                 });
             } elseif ($user->role === 'manager') {
-                $query->where('manager_id', $user->id);
+                $query->where(function($q2) use ($user) {
+                    $q2->where('manager_id', $user->id)
+                       ->orWhereExists(function ($q3) use ($user) {
+                           $q3->select(DB::raw(1))
+                              ->from('project_manager')
+                              ->whereColumn('project_manager.project_id', 'projects.id')
+                              ->where('project_manager.user_id', $user->id);
+                       });
+                });
             }
             // Admin sees all - no filter
             
@@ -107,7 +115,7 @@ class DashboardController extends Controller
             if ($user->role === 'developer') {
                 $todoQuery->where('assignee_id', $user->id);
             } elseif ($user->role === 'manager') {
-                $todoQuery->whereHas('project', fn($q) => $q->where('manager_id', $user->id));
+                $todoQuery->whereHas('project', fn($q) => $q->where('manager_id', $user->id)->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id)));
             }
             $openTodos = $todoQuery->count();
 
@@ -116,7 +124,7 @@ class DashboardController extends Controller
             if ($user->role === 'developer') {
                 $ticketQuery->whereHas('project.developers', fn($q) => $q->where('user_id', $user->id));
             } elseif ($user->role === 'manager') {
-                $ticketQuery->whereHas('project', fn($q) => $q->where('manager_id', $user->id));
+                $ticketQuery->whereHas('project', fn($q) => $q->where('manager_id', $user->id)->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id)));
             }
             $openTickets = $ticketQuery->count();
 
@@ -150,7 +158,10 @@ class DashboardController extends Controller
         if ($user->role === 'developer') {
             $query->whereHas('developers', fn($q) => $q->where('user_id', $user->id));
         } elseif ($user->role === 'manager') {
-            $query->where('manager_id', $user->id);
+            $query->where(function($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+            });
         }
         // Admin sees all
 

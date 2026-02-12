@@ -37,7 +37,7 @@ class CredentialPolicy
         $project = $credential->project;
         
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         if ($user->role === 'developer') {
@@ -70,7 +70,7 @@ class CredentialPolicy
         $project = $credential->project;
         
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         if ($user->role === 'developer') {
@@ -89,7 +89,7 @@ class CredentialPolicy
         $project = $credential->project;
         
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         return false;
@@ -120,7 +120,7 @@ class CredentialPolicy
         $project = $credential->project;
         
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id;
+            return $project->managers->contains('id', $user->id);
         }
         
         if ($user->role === 'developer') {

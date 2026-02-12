@@ -134,7 +134,7 @@ class CreateTodoTool extends Tool
     private function isUserOnProject($user, $project): bool
     {
         // Check if user is manager
-        if ($project->manager_id === $user->id) {
+        if ($project->managers->contains('id', $user->id)) {
             return true;
         }
         
@@ -160,7 +160,7 @@ class CreateTodoTool extends Tool
     private function canAccessProject($user, $project): bool
     {
         if ($user->role === 'admin') return true;
-        if ($user->role === 'manager' && $project->manager_id === $user->id) return true;
+        if ($user->role === 'manager' && $project->managers->contains('id', $user->id)) return true;
         if ($user->role === 'developer' && $project->developers->contains('id', $user->id)) return true;
         return false;
     }

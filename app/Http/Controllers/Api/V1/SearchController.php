@@ -49,7 +49,10 @@ class SearchController extends Controller
                   ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
             });
         } elseif ($user->role === 'manager') {
-            $projectsQuery->where('manager_id', $user->id);
+            $projectsQuery->where(function($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+            });
         }
 
         $projects = $projectsQuery->limit($limit)->get();
@@ -69,7 +72,10 @@ class SearchController extends Controller
                             ->orWhereHas('developers', fn($d) => $d->where('users.id', $user->id));
                     });
                 } elseif ($user->role === 'manager') {
-                    $q->where('manager_id', $user->id);
+                    $q->where(function($sub) use ($user) {
+                        $sub->where('manager_id', $user->id)
+                            ->orWhereHas('managers', fn($m) => $m->where('users.id', $user->id));
+                    });
                 }
             });
 

@@ -38,7 +38,7 @@ class ProjectController extends Controller
         $user = $request->user();
         
         $query = Project::query()
-            ->with(['manager:id,name,email', 'developer:id,name,email', 'developers:id,name,email', 'tags'])
+            ->with(['manager:id,name,email', 'managers:id,name,email', 'developer:id,name,email', 'developers:id,name,email', 'tags'])
             ->withCount(['todos', 'credentials', 'resources', 'maintenanceReports'])
             ->withCount(['todos as pending_todos_count' => fn($q) => $q->where('status', '!=', 'completed')]);
 
@@ -49,7 +49,10 @@ class ProjectController extends Controller
                   ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
             });
         } elseif ($user->role === 'manager') {
-            $query->where('manager_id', $user->id);
+            $query->where(function($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+            });
         }
         // Admin sees all
 
@@ -65,7 +68,11 @@ class ProjectController extends Controller
 
         // Filter by manager
         if ($request->filled('manager_id')) {
-            $query->where('manager_id', $request->manager_id);
+            $managerId = $request->manager_id;
+            $query->where(function($q) use ($managerId) {
+                $q->where('manager_id', $managerId)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $managerId));
+            });
         }
 
         // Filter by developer
@@ -125,7 +132,10 @@ class ProjectController extends Controller
                   ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
             });
         } elseif ($user->role === 'manager') {
-            $query->where('manager_id', $user->id);
+            $query->where(function($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+            });
         }
 
         // Search by name, URL (domain), external_id, or maint_id
@@ -166,6 +176,7 @@ class ProjectController extends Controller
             'libraryResources',
             'todos.assignee:id,name,email',
             'manager:id,name,email',
+            'managers:id,name,email',
             'developer:id,name,email',
             'developers:id,name,email',
             'tags',
@@ -190,18 +201,38 @@ class ProjectController extends Controller
         // Extract relationship arrays before creating project
         $tagIds = $validated['tag_ids'] ?? [];
         $developerIds = $validated['developer_ids'] ?? [];
+        $managerIds = $validated['manager_ids'] ?? [];
         $addMaintenanceTodos = $validated['add_maintenance_todos'] ?? false;
-        unset($validated['tag_ids'], $validated['developer_ids'], $validated['add_maintenance_todos']);
+        unset($validated['tag_ids'], $validated['developer_ids'], $validated['manager_ids'], $validated['add_maintenance_todos']);
 
         // Set defaults
         $validated['health_status'] = $validated['health_status'] ?? 'online';
         $validated['security_status'] = $validated['security_status'] ?? 'secure';
+
+        // If manager_ids provided, also set legacy manager_id to first one
+        if (!empty($managerIds) && empty($validated['manager_id'])) {
+            $validated['manager_id'] = $managerIds[0];
+        }
 
         $project = Project::create($validated);
 
         // Sync tags
         if (!empty($tagIds)) {
             $project->tags()->sync($tagIds);
+        }
+
+        // Sync managers and notify
+        if (!empty($managerIds)) {
+            $project->managers()->sync($managerIds);
+            foreach ($managerIds as $mgrId) {
+                $manager = User::find($mgrId);
+                $manager?->notify(new ProjectAssignedNotification($project, 'manager'));
+            }
+        } elseif ($project->manager_id) {
+            // Legacy single manager_id — also add to pivot
+            $project->managers()->sync([$project->manager_id]);
+            $manager = User::find($project->manager_id);
+            $manager?->notify(new ProjectAssignedNotification($project, 'manager'));
         }
 
         // Sync developers and notify
@@ -213,18 +244,12 @@ class ProjectController extends Controller
             }
         }
 
-        // Notify assigned manager
-        if ($project->manager_id) {
-            $manager = User::find($project->manager_id);
-            $manager?->notify(new ProjectAssignedNotification($project, 'manager'));
-        }
-
         // Create maintenance init todos if requested
         if ($addMaintenanceTodos) {
             $this->createMaintenanceTodos($project);
         }
 
-        $project->load(['manager', 'developers', 'tags']);
+        $project->load(['manager', 'managers', 'developers', 'tags']);
 
         return $this->createdResponse(
             new ProjectResource($project),
@@ -247,7 +272,7 @@ class ProjectController extends Controller
         $validated = $request->validated();
 
         // Track changes for notifications
-        $oldManagerId = $project->manager_id;
+        $oldManagerIds = $project->managers->pluck('id')->toArray();
         $oldDeveloperIds = $project->developers->pluck('id')->toArray();
         $oldHealthStatus = $project->health_status;
         $oldSecurityStatus = $project->security_status;
@@ -255,11 +280,13 @@ class ProjectController extends Controller
         // Extract relationship arrays
         $tagIds = $validated['tag_ids'] ?? null;
         $developerIds = $validated['developer_ids'] ?? null;
-        unset($validated['tag_ids'], $validated['developer_ids']);
+        $managerIds = $validated['manager_ids'] ?? null;
+        unset($validated['tag_ids'], $validated['developer_ids'], $validated['manager_ids']);
 
         // Role-based restrictions for assignments
         if (!$user->isAdmin()) {
             unset($validated['manager_id']);
+            $managerIds = null;
         }
         if (!$user->isAdmin() && !$user->isManager()) {
             // Developers can't change developer assignments
@@ -273,6 +300,27 @@ class ProjectController extends Controller
             $project->tags()->sync($tagIds);
         }
 
+        // Sync managers if provided and notify new ones
+        if ($managerIds !== null) {
+            $project->managers()->sync($managerIds);
+            // Also keep legacy manager_id in sync
+            $project->update(['manager_id' => !empty($managerIds) ? $managerIds[0] : null]);
+            $newManagerIds = array_diff($managerIds, $oldManagerIds);
+            foreach ($newManagerIds as $mgrId) {
+                $manager = User::find($mgrId);
+                $manager?->notify(new ProjectAssignedNotification($project, 'manager'));
+            }
+        } elseif (isset($validated['manager_id']) && $validated['manager_id'] != ($oldManagerIds[0] ?? null)) {
+            // Legacy single manager_id update — also sync pivot
+            if ($validated['manager_id']) {
+                $project->managers()->sync([$validated['manager_id']]);
+                $newManager = User::find($validated['manager_id']);
+                $newManager?->notify(new ProjectAssignedNotification($project, 'manager'));
+            } else {
+                $project->managers()->detach();
+            }
+        }
+
         // Sync developers if provided and notify new ones
         if ($developerIds !== null) {
             $project->developers()->sync($developerIds);
@@ -283,16 +331,10 @@ class ProjectController extends Controller
             }
         }
 
-        // Notify new manager
-        if (isset($validated['manager_id']) && $validated['manager_id'] != $oldManagerId && $validated['manager_id']) {
-            $newManager = User::find($validated['manager_id']);
-            $newManager?->notify(new ProjectAssignedNotification($project, 'manager'));
-        }
-
         // Notify team of status changes
         $this->notifyStatusChanges($project, $oldHealthStatus, $oldSecurityStatus);
 
-        $project->load(['manager', 'developers', 'tags']);
+        $project->load(['manager', 'managers', 'developers', 'tags']);
 
         return new ProjectResource($project);
     }
@@ -626,7 +668,11 @@ class ProjectController extends Controller
 
         $teamMembers = collect();
         
-        if ($project->manager_id) {
+        foreach ($project->managers as $manager) {
+            $teamMembers->push($manager);
+        }
+        // Fallback: legacy manager_id
+        if ($teamMembers->isEmpty() && $project->manager_id) {
             $teamMembers->push(User::find($project->manager_id));
         }
         if ($project->developer_id) {

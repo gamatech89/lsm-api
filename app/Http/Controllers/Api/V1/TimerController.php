@@ -129,6 +129,7 @@ class TimerController extends Controller
             $query->where(function ($q) use ($user) {
                 $q->where('developer_id', $user->id)
                   ->orWhere('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id))
                   ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
             });
         }

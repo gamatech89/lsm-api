@@ -120,7 +120,10 @@ class TimesheetController extends Controller
 
         // If manager, only show entries from projects they manage
         if ($user->role === 'manager') {
-            $projectIds = \App\Models\Project::where('manager_id', $user->id)->pluck('id');
+            $projectIds = \App\Models\Project::where(function($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+            })->pluck('id');
             $query->whereIn('project_id', $projectIds);
         }
 
@@ -136,7 +139,10 @@ class TimesheetController extends Controller
             
             // Manager filtering
             if ($user->role === 'manager') {
-                $projectIds = \App\Models\Project::where('manager_id', $user->id)->pluck('id');
+                $projectIds = \App\Models\Project::where(function($q) use ($user) {
+                    $q->where('manager_id', $user->id)
+                      ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+                })->pluck('id');
                 $entriesQuery->whereIn('project_id', $projectIds);
             }
             

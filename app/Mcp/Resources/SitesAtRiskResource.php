@@ -39,7 +39,10 @@ class SitesAtRiskResource extends Resource
         if ($user->role === 'developer') {
             $query->whereHas('developers', fn($q) => $q->where('user_id', $user->id));
         } elseif ($user->role === 'manager') {
-            $query->where('manager_id', $user->id);
+            $query->where(function($q) use ($user) {
+                $q->where('manager_id', $user->id)
+                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+            });
         }
         // Admin sees all
 

@@ -173,8 +173,12 @@ class CreateBackupJob implements ShouldQueue
     {
         $recipients = [];
 
-        // Get project owner/manager
-        if ($project->manager_id) {
+        // Get project managers
+        foreach ($project->managers as $manager) {
+            $recipients[] = $manager;
+        }
+        // Fallback: legacy manager_id
+        if (empty($recipients) && $project->manager_id) {
             $recipients[] = $project->manager;
         }
 

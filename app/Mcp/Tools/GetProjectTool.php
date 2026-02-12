@@ -40,7 +40,7 @@ class GetProjectTool extends Tool
                 return Response::error('You do not have access to this project.');
             }
         } elseif ($user->role === 'manager') {
-            if ($project->manager_id !== $user->id) {
+            if (!$project->managers->contains('id', $user->id)) {
                 return Response::error('You do not have access to this project.');
             }
         }

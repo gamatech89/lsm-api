@@ -35,7 +35,7 @@ class ListTodosTool extends Tool
             if ($user->role === 'developer') {
                 $query->whereHas('project.developers', fn($q) => $q->where('user_id', $user->id));
             } elseif ($user->role === 'manager') {
-                $query->whereHas('project', fn($q) => $q->where('manager_id', $user->id));
+                $query->whereHas('project', fn($q) => $q->where('manager_id', $user->id)->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id)));
             }
         }
 

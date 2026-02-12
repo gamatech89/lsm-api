@@ -30,7 +30,8 @@ class ListSupportTicketsTool extends Tool
                 $q->where('created_by', $user->id)
                     ->orWhere('assigned_to', $user->id)
                     ->orWhereHas('project', function ($pq) use ($user) {
-                        $pq->where('manager_id', $user->id);
+                        $pq->where('manager_id', $user->id)
+                            ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
                     });
             });
         }

@@ -33,8 +33,8 @@ class UpdateProjectTool extends Tool
             return Response::error("Project with ID {$input['project_id']} not found.");
         }
 
-        // Only admins can update projects
-        if ($user->role !== 'admin' && $project->manager_id !== $user->id) {
+        // Only admins and project managers can update projects
+        if ($user->role !== 'admin' && !$project->managers->contains('id', $user->id)) {
             return Response::error('Only admins and project managers can update projects.');
         }
 
@@ -74,9 +74,11 @@ class UpdateProjectTool extends Tool
 
         // Handle REMOVING manager (clear_manager = true)
         if (!empty($input['clear_manager'])) {
-            $oldManager = $project->manager ? $project->manager->name : 'None';
+            $oldManagers = $project->managers->pluck('name')->toArray();
+            $oldDisplay = !empty($oldManagers) ? implode(', ', $oldManagers) : 'None';
             $project->manager_id = null;
-            $updates[] = "removed manager ({$oldManager})";
+            $project->managers()->detach();
+            $updates[] = "removed manager(s) ({$oldDisplay})";
         }
 
         // Handle manager assignment by ID
@@ -86,6 +88,7 @@ class UpdateProjectTool extends Tool
                 return Response::error("User with ID {$input['manager_id']} not found.");
             }
             $project->manager_id = $input['manager_id'];
+            $project->managers()->sync([$input['manager_id']]);
             $updates[] = "manager → {$manager->name}";
         }
 
@@ -98,6 +101,7 @@ class UpdateProjectTool extends Tool
                 return Response::error("Manager '{$input['manager_name']}' not found.");
             }
             $project->manager_id = $manager->id;
+            $project->managers()->sync([$manager->id]);
             $updates[] = "manager → {$manager->name}";
         }
 

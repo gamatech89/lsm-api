@@ -267,7 +267,11 @@ class CheckProjectsHealth extends Command
     {
         $teamMembers = collect();
 
-        if ($project->manager_id) {
+        foreach ($project->managers as $manager) {
+            $teamMembers->push($manager);
+        }
+        // Fallback: legacy manager_id
+        if ($teamMembers->isEmpty() && $project->manager_id) {
             $teamMembers->push(User::find($project->manager_id));
         }
         if ($project->developer_id) {

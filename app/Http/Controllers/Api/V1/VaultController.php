@@ -34,7 +34,10 @@ class VaultController extends Controller
                             ->orWhereHas('developers', fn($d) => $d->where('users.id', $user->id));
                     });
                 } elseif ($user->role === 'manager') {
-                    $q->where('manager_id', $user->id);
+                    $q->where(function($sub) use ($user) {
+                        $sub->where('manager_id', $user->id)
+                            ->orWhereHas('managers', fn($m) => $m->where('users.id', $user->id));
+                    });
                 }
                 // Admin sees all - no filter
             });

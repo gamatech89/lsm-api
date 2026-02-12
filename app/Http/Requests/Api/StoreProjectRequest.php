@@ -53,6 +53,8 @@ class StoreProjectRequest extends FormRequest
             
             // Assignments
             'manager_id' => ['nullable', 'exists:users,id'],
+            'manager_ids' => ['nullable', 'array'],
+            'manager_ids.*' => ['exists:users,id'],
             'developer_ids' => ['nullable', 'array'],
             'developer_ids.*' => ['exists:users,id'],
             'tag_ids' => ['nullable', 'array'],

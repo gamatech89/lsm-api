@@ -73,8 +73,11 @@ class CredentialShareController extends Controller
                 'has_password' => !empty($link->access_password),
                 'note' => $link->note,
                 'expires_at' => $link->expires_at,
-                'credential_title' => $link->credential->title, // Exposed title
+                'credential_title' => $link->credential->title,
                 'credential_type' => $link->credential->type,
+                'view_count' => $link->view_count,
+                'max_views' => $link->max_views,
+                'views_remaining' => $link->max_views - $link->view_count,
             ]
         ]);
     }
@@ -119,10 +122,17 @@ class CredentialShareController extends Controller
             'accessed_at' => now(),
         ]);
 
-        // Return the full credential resource with password revealed
+        // Return the full credential resource with password revealed + share metadata
         return response()->json([
             'success' => true,
-            'data' => CredentialResource::withPassword($link->credential)
+            'data' => CredentialResource::withPassword($link->credential),
+            'share_info' => [
+                'expires_at' => $link->expires_at,
+                'view_count' => $link->view_count,
+                'max_views' => $link->max_views,
+                'views_remaining' => $link->max_views - $link->view_count,
+                'note' => $link->note,
+            ]
         ]);
     }
 }
