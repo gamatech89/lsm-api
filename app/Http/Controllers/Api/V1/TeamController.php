@@ -78,6 +78,7 @@ class TeamController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => ['required', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => 'required|in:admin,manager,developer,viewer',
+            'is_admin' => 'nullable|boolean',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'exists:tags,id',
         ]);
@@ -117,6 +118,7 @@ class TeamController extends Controller
             'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
             'password' => ['sometimes', 'nullable', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => 'sometimes|required|in:admin,manager,developer,viewer',
+            'is_admin' => 'nullable|boolean',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'exists:tags,id',
         ]);

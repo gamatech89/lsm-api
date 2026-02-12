@@ -12,7 +12,7 @@ class InvoicePolicy
      */
     public function before(User $user, string $ability): ?bool
     {
-        if ($user->role === 'admin') {
+        if ($user->isAdmin()) {
             return true;
         }
         return null;

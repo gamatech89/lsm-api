@@ -27,6 +27,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'is_admin',
         'last_login_at',
         'hourly_rate',
     ];
@@ -59,15 +60,17 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'last_login_at' => 'datetime',
+            'is_admin' => 'boolean',
         ];
     }
 
     /**
      * Check if user is an admin.
+     * Returns true for admin role OR any user with the is_admin flag.
      */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->role === 'admin' || $this->is_admin;
     }
 
     /**
