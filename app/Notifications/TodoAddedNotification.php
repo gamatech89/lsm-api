@@ -3,14 +3,12 @@
 namespace App\Notifications;
 
 use App\Models\Todo;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TodoAddedNotification extends Notification implements ShouldQueue
+class TodoAddedNotification extends Notification
 {
-    use Queueable;
 
     public function __construct(
         protected Todo $todo,
