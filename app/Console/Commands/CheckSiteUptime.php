@@ -208,15 +208,18 @@ class CheckSiteUptime extends Command
 
         // Success - parse health data
         $healthData = $response->json() ?? [];
+        
+        // The plugin response wraps data inside a 'data' key
+        $data = $healthData['data'] ?? $healthData;
 
         $project->update([
             'last_health_check_at' => now(),
             'response_time_ms' => $responseTime,
             'last_health_details' => $healthData,
-            'wp_version' => $healthData['wordpress']['version'] ?? null,
-            'php_version' => $healthData['php']['version'] ?? null,
-            'outdated_plugins_count' => $healthData['plugins']['outdated_count'] ?? 0,
-            'ssl_status' => ($healthData['ssl']['enabled'] ?? false) ? 'valid' : 'none',
+            'wp_version' => $data['wordpress']['version'] ?? null,
+            'php_version' => $data['php']['version'] ?? null,
+            'outdated_plugins_count' => $data['plugins']['outdated_count'] ?? 0,
+            'ssl_status' => ($data['ssl']['enabled'] ?? false) ? 'valid' : 'none',
             'health_status' => 'online',
         ]);
 
