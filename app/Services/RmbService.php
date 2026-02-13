@@ -329,6 +329,7 @@ class RmbService
             $params['key'] = $this->apiKey;
             
             $response = Http::timeout(self::DEFAULT_TIMEOUT)
+                ->withOptions(['allow_redirects' => true])
                 ->get($this->baseUrl . $endpoint, $params);
 
             return $this->handleResponse($response);
@@ -352,6 +353,7 @@ class RmbService
 
         try {
             $response = Http::timeout(self::DEFAULT_TIMEOUT)
+                ->withOptions(['allow_redirects' => true])
                 ->asJson()
                 ->post($this->baseUrl . $endpoint . '?key=' . $this->apiKey, $data);
 
@@ -437,6 +439,7 @@ class RmbService
     {
         try {
             $response = Http::timeout(10)
+                ->withOptions(['allow_redirects' => true])
                 ->get(rtrim($this->project->url, '/') . $namespace . '/info');
 
             if ($response->successful()) {

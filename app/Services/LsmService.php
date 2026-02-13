@@ -469,6 +469,7 @@ class LsmService
             $params['key'] = $this->apiKey;
             
             $response = Http::timeout(self::DEFAULT_TIMEOUT)
+                ->withOptions(['allow_redirects' => true])
                 ->get($this->baseUrl . $endpoint, $params);
 
             return $this->handleResponse($response);
@@ -487,6 +488,7 @@ class LsmService
             $url = $this->baseUrl . $endpoint . '?key=' . $this->apiKey;
             
             $response = Http::timeout(self::DEFAULT_TIMEOUT)
+                ->withOptions(['allow_redirects' => true])
                 ->asJson() // Ensure JSON content type
                 ->post($url, $data);
 
