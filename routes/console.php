@@ -107,20 +107,14 @@ Schedule::job(new \App\Jobs\SyncPhpErrorsJob())
 
 /*
 |--------------------------------------------------------------------------
-| Queue Worker (Cron-Based)
+| Queue Worker
 |--------------------------------------------------------------------------
 |
-| Processes queued jobs (notifications, etc.) every minute.
-| Uses --stop-when-empty so the process exits once all jobs are done,
-| and --max-time=55 to avoid overlap with the next scheduled run.
+| Queue is set to 'sync' driver on Hostinger shared hosting because
+| pcntl_signal() is not available. Jobs execute immediately inline.
+| No separate queue worker is needed.
 |
 */
-
-Schedule::command('queue:work --stop-when-empty --max-time=55')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground()
-    ->name('queue-worker');
 
 /*
 |--------------------------------------------------------------------------
