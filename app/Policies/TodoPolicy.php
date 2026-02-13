@@ -87,11 +87,11 @@ class TodoPolicy
 
     /**
      * Determine whether the user can delete the todo.
-     * Managers and developers (of their projects) can delete.
+     * Only admins and managers (of their projects) can delete.
      */
     public function delete(User $user, Todo $todo): bool
     {
-        if ($user->role === 'viewer') {
+        if ($user->role === 'viewer' || $user->role === 'developer') {
             return false;
         }
 
@@ -99,11 +99,6 @@ class TodoPolicy
 
         if ($user->role === 'manager') {
             return $project->managers->contains('id', $user->id);
-        }
-        
-        if ($user->role === 'developer') {
-            return $project->developer_id === $user->id
-                || $project->developers()->where('user_id', $user->id)->exists();
         }
         
         return false;
