@@ -107,6 +107,23 @@ Schedule::job(new \App\Jobs\SyncPhpErrorsJob())
 
 /*
 |--------------------------------------------------------------------------
+| Queue Worker (Cron-Based)
+|--------------------------------------------------------------------------
+|
+| Processes queued jobs (notifications, etc.) every minute.
+| Uses --stop-when-empty so the process exits once all jobs are done,
+| and --max-time=55 to avoid overlap with the next scheduled run.
+|
+*/
+
+Schedule::command('queue:work --stop-when-empty --max-time=55')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('queue-worker');
+
+/*
+|--------------------------------------------------------------------------
 | Domain Expiry Checks (WHOIS)
 |--------------------------------------------------------------------------
 |
