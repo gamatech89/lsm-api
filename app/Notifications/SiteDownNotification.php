@@ -3,12 +3,14 @@
 namespace App\Notifications;
 
 use App\Models\Project;
-
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class SiteDownNotification extends Notification
+class SiteDownNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
 
     public function __construct(
         protected Project $project,

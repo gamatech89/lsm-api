@@ -3,13 +3,15 @@
 namespace App\Notifications;
 
 use App\Models\Backup;
-
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Messages\SlackMessage;
 use Illuminate\Notifications\Notification;
 
-class BackupFailedNotification extends Notification
+class BackupFailedNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
 
     /**
      * The backup that failed.
