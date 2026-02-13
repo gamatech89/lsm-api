@@ -91,9 +91,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('projects.quick-search');
 
         // -------------------------------------------------
-        // REMOTE MANAGEMENT BRIDGE (WordPress Plugin) -> LSM
+        // LSM (Landeseiten Maintenance WordPress Plugin)
         // -------------------------------------------------
-        Route::prefix('projects/{project}/rmb')->name('projects.rmb.')->group(function () {
+        Route::prefix('projects/{project}/lsm')->name('projects.lsm.')->group(function () {
             // Status & Health
             Route::get('/status', [V1\LsmController::class, 'status'])->name('status');
             Route::get('/health', [V1\LsmController::class, 'health'])->name('health');
