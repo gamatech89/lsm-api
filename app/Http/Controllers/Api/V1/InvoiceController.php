@@ -209,7 +209,7 @@ class InvoiceController extends Controller
     /**
      * Download invoice as PDF
      */
-    public function downloadPdf(Invoice $invoice)
+    public function downloadPdf(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
 
@@ -220,6 +220,10 @@ class InvoiceController extends Controller
 
         $invoice->load(['user', 'entries.project', 'entries.todo']);
         $invoiceUser = $invoice->user;
+
+        // Allow custom invoice number and from name
+        $customInvoiceNumber = $request->query('custom_invoice_number', $invoice->invoice_number);
+        $fromName = $request->query('from_name', $invoiceUser->billing_company_name ?? $invoiceUser->name);
 
         // Group entries by project for line items
         $grouped = $invoice->entries->groupBy('project_id');
@@ -261,6 +265,8 @@ class InvoiceController extends Controller
         $data = [
             'invoice' => $invoice,
             'user' => $invoiceUser,
+            'customInvoiceNumber' => $customInvoiceNumber,
+            'fromName' => $fromName,
             'lineItems' => $lineItems,
             'subtotal' => $subtotal,
             'taxRate' => $taxRate,
@@ -277,7 +283,7 @@ class InvoiceController extends Controller
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice_pdf', $data);
         $pdf->setPaper('A4', 'portrait');
 
-        $filename = $invoice->invoice_number . '.pdf';
+        $filename = $customInvoiceNumber . '.pdf';
 
         return $pdf->download($filename);
     }

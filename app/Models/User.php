@@ -40,7 +40,7 @@ class User extends Authenticatable
      * Default attribute values
      */
     protected $attributes = [
-        'hourly_rate' => 22.00,
+        'hourly_rate' => 22.50,
     ];
 
     /**

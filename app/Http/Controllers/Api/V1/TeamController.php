@@ -119,6 +119,7 @@ class TeamController extends Controller
             'password' => ['sometimes', 'nullable', Password::min(8)->mixedCase()->numbers()->symbols()],
             'role' => 'sometimes|required|in:admin,manager,developer,viewer',
             'is_admin' => 'nullable|boolean',
+            'hourly_rate' => 'sometimes|numeric|min:0|max:999',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'exists:tags,id',
         ]);
