@@ -36,6 +36,7 @@ class MaintenanceReportResource extends JsonResource
             'notes' => $this->notes,
             'time_spent_minutes' => $this->time_spent_minutes,
             'time_spent_formatted' => $this->time_spent_formatted,
+            'has_uploaded_pdf' => !empty($this->pdf_path),
             
             // Author
             'user' => new UserResource($this->whenLoaded('user')),

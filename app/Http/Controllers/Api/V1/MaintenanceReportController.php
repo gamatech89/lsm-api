@@ -9,6 +9,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Maintenance Report Controller
@@ -64,7 +65,7 @@ class MaintenanceReportController extends Controller
         $validated = $request->validate([
             'report_date' => 'required|date',
             'type' => 'required|in:monthly,weekly,ad-hoc',
-            'summary' => 'required|string',
+            'summary' => 'nullable|string',
             'tasks_completed' => 'nullable|array',
             'tasks_completed.*' => 'string',
             'updates_performed' => 'nullable|array',
@@ -78,7 +79,29 @@ class MaintenanceReportController extends Controller
             'notes' => 'nullable|string',
             'time_spent_minutes' => 'nullable|integer|min:0',
             'invoice_id' => 'nullable|exists:invoices,id',
+            'pdf_file' => 'nullable|file|mimes:pdf|max:20480', // Max 20MB
         ]);
+
+        // Handle PDF file upload
+        if ($request->hasFile('pdf_file')) {
+            $path = $request->file('pdf_file')->store(
+                "maintenance-reports/{$project->id}",
+                'local'
+            );
+            $validated['pdf_path'] = $path;
+
+            // Default summary if not provided for uploaded PDFs
+            if (empty($validated['summary'])) {
+                $validated['summary'] = 'Uploaded PDF report';
+            }
+        }
+
+        // Ensure summary is set for classic reports
+        if (empty($validated['summary']) && !isset($validated['pdf_path'])) {
+            return response()->json(['message' => 'Summary is required for classic reports.'], 422);
+        }
+
+        unset($validated['pdf_file']);
 
         $validated['project_id'] = $project->id;
         $validated['user_id'] = auth()->id();
@@ -132,6 +155,11 @@ class MaintenanceReportController extends Controller
     {
         Gate::authorize('update', $maintenanceReport->project);
 
+        // Delete uploaded PDF file if it exists
+        if ($maintenanceReport->pdf_path && Storage::disk('local')->exists($maintenanceReport->pdf_path)) {
+            Storage::disk('local')->delete($maintenanceReport->pdf_path);
+        }
+
         $maintenanceReport->delete();
 
         return $this->successResponse(null, 'Maintenance report deleted successfully');
@@ -147,6 +175,18 @@ class MaintenanceReportController extends Controller
     {
         Gate::authorize('view', $maintenanceReport->project);
 
+        // If an uploaded PDF exists, serve it directly
+        if ($maintenanceReport->pdf_path && Storage::disk('local')->exists($maintenanceReport->pdf_path)) {
+            $filename = sprintf(
+                'maintenance-report-%s-%s.pdf',
+                $maintenanceReport->project?->name ?? $maintenanceReport->project_id,
+                $maintenanceReport->report_date
+            );
+
+            return Storage::disk('local')->download($maintenanceReport->pdf_path, $filename);
+        }
+
+        // Otherwise generate PDF from report data
         $maintenanceReport->load(['user:id,name,hourly_rate', 'project:id,name,url,project_external_id']);
 
         $pdf = Pdf::loadView('pdf.maintenance-report', [

@@ -437,6 +437,59 @@ class LsmService
         return $this->get('/security/headers/snippets');
     }
 
+    // =========================================================================
+    // SECURITY SCANNING
+    // =========================================================================
+
+    /**
+     * Run a full security scan on the WordPress site.
+     *
+     * @param array|null $modules Specific modules to run (null = all)
+     */
+    public function runSecurityScan(?array $modules = null): ?array
+    {
+        if (!$this->isConfigured()) return null;
+
+        try {
+            $url = $this->baseUrl . '/security/scan?key=' . $this->apiKey;
+            $data = [];
+            if ($modules) {
+                $data['modules'] = implode(',', $modules);
+            }
+
+            $response = Http::timeout(120) // Extended timeout for scans
+                ->withOptions(['allow_redirects' => true])
+                ->asJson()
+                ->post($url, $data);
+
+            return $this->handleResponse($response);
+        } catch (\Exception $e) {
+            Log::error("LSM Security Scan Error: {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    /**
+     * Run a quick security scan on the WordPress site.
+     */
+    public function runQuickScan(): ?array
+    {
+        if (!$this->isConfigured()) return null;
+
+        try {
+            $params = ['key' => $this->apiKey];
+
+            $response = Http::timeout(90)
+                ->withOptions(['allow_redirects' => true])
+                ->get($this->baseUrl . '/security/scan/quick', $params);
+
+            return $this->handleResponse($response);
+        } catch (\Exception $e) {
+            Log::error("LSM Quick Scan Error: {$e->getMessage()}");
+            return null;
+        }
+    }
+
     /**
      * Legacy alias for backwards compatibility.
      * @deprecated Use getPhpErrors() instead

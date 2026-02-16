@@ -40,6 +40,11 @@ class TimeEntryResource extends JsonResource
                 'name' => $this->project->name,
                 'url' => $this->project->url,
             ]),
+            'todo' => $this->whenLoaded('todo', fn() => $this->todo ? [
+                'id' => $this->todo->id,
+                'title' => $this->todo->title,
+                'status' => $this->todo->status,
+            ] : null),
             'approver' => $this->whenLoaded('approver', fn() => $this->approver ? [
                 'id' => $this->approver->id,
                 'name' => $this->approver->name,

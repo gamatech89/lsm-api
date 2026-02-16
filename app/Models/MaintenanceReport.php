@@ -17,6 +17,7 @@ class MaintenanceReport extends Model
         'issues_found',
         'issues_resolved',
         'notes',
+        'pdf_path',
         'time_spent_minutes',
         'invoice_id',
     ];

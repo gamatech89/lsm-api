@@ -29,7 +29,7 @@ class TimeEntryController extends Controller
         ]);
 
         $user = Auth::user();
-        $query = TimeEntry::with(['project', 'user'])
+        $query = TimeEntry::with(['project', 'user', 'todo'])
             ->completed()
             ->orderByDesc('started_at');
 
@@ -50,6 +50,11 @@ class TimeEntryController extends Controller
         // Filter by project
         if ($request->project_id) {
             $query->forProject($request->project_id);
+        }
+
+        // Filter by todo
+        if ($request->todo_id) {
+            $query->where('todo_id', $request->todo_id);
         }
 
         // Filter by status
@@ -129,7 +134,7 @@ class TimeEntryController extends Controller
             return $this->forbidden();
         }
 
-        $timeEntry->load(['project', 'user', 'approver']);
+        $timeEntry->load(['project', 'user', 'approver', 'todo']);
 
         return $this->success(new TimeEntryResource($timeEntry));
     }
@@ -210,7 +215,7 @@ class TimeEntryController extends Controller
      */
     public function today()
     {
-        $entries = TimeEntry::with(['project'])
+        $entries = TimeEntry::with(['project', 'todo'])
             ->forUser(Auth::id())
             ->whereDate('started_at', Carbon::today())
             ->orderByDesc('started_at')

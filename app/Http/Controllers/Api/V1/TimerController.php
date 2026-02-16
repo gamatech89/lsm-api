@@ -16,7 +16,7 @@ class TimerController extends Controller
      */
     public function current()
     {
-        $entry = TimeEntry::with(['project'])
+        $entry = TimeEntry::with(['project', 'todo'])
             ->forUser(Auth::id())
             ->running()
             ->first();
@@ -35,6 +35,7 @@ class TimerController extends Controller
     {
         $request->validate([
             'project_id' => 'required|exists:projects,id',
+            'todo_id' => 'nullable|exists:todos,id',
             'description' => 'nullable|string|max:500',
             'is_billable' => 'nullable|boolean',
         ]);
@@ -58,6 +59,7 @@ class TimerController extends Controller
         $entry = TimeEntry::create([
             'user_id' => Auth::id(),
             'project_id' => $request->project_id,
+            'todo_id' => $request->todo_id,
             'description' => $request->description,
             'started_at' => Carbon::now(),
             'is_billable' => $request->is_billable ?? $user->default_billable ?? true,
@@ -65,7 +67,7 @@ class TimerController extends Controller
             'timesheet_id' => $timesheet->id,
         ]);
 
-        $entry->load('project');
+        $entry->load(['project', 'todo']);
 
         return $this->created(new TimeEntryResource($entry), 'Timer started');
     }

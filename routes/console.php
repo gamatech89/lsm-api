@@ -133,3 +133,22 @@ Schedule::command('projects:check-domains')
     ->runInBackground()
     ->name('domain-expiry-check')
     ->onOneServer();
+
+/*
+|--------------------------------------------------------------------------
+| Security Scanning
+|--------------------------------------------------------------------------
+|
+| Automated malware and security scanning of WordPress sites.
+| Full scan runs weekly on Sundays at 3:00 AM.
+|
+*/
+
+Schedule::command('security:scan --notify')
+    ->weeklyOn(0, '03:00') // Sunday at 3:00 AM
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('security-scan-weekly')
+    ->onOneServer();
+

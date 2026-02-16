@@ -153,6 +153,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/security-settings', [V1\LsmController::class, 'updateSecuritySettings'])->name('security-settings.update');
             Route::get('/security-headers', [V1\LsmController::class, 'getSecurityHeaders'])->name('security-headers');
             Route::get('/security-headers/snippets', [V1\LsmController::class, 'getSecurityHeaderSnippets'])->name('security-headers.snippets');
+
+            // Security Scanning
+            Route::post('/security-scan', [V1\SecurityScanController::class, 'scan'])->name('security-scan');
+            Route::get('/security-scans', [V1\SecurityScanController::class, 'index'])->name('security-scans.index');
+            Route::get('/security-scans/latest', [V1\SecurityScanController::class, 'latest'])->name('security-scans.latest');
+            Route::get('/security-scans/stats', [V1\SecurityScanController::class, 'stats'])->name('security-scans.stats');
+            Route::get('/security-scans/{securityScan}', [V1\SecurityScanController::class, 'show'])->name('security-scans.show');
         });
 
         // -------------------------------------------------

@@ -46,6 +46,9 @@ class Project extends Model
         // Domain expiry (WHOIS)
         'domain_expires_at',
         'domain_registrar',
+        // Security scanning
+        'last_security_scan_at',
+        'last_security_scan_risk',
     ];
 
     protected $appends = ['highest_todo_priority'];
@@ -61,6 +64,7 @@ class Project extends Model
             'ssl_alerts_enabled' => 'boolean',
             'domain_alerts_enabled' => 'boolean',
             'notification_preferences' => 'array',
+            'last_security_scan_at' => 'datetime',
         ];
     }
 
@@ -245,6 +249,14 @@ class Project extends Model
     public function uptimeChecks(): HasMany
     {
         return $this->hasMany(UptimeCheck::class)->orderBy('checked_at', 'desc');
+    }
+
+    /**
+     * Get the security scans for this project.
+     */
+    public function securityScans(): HasMany
+    {
+        return $this->hasMany(SecurityScan::class)->orderBy('created_at', 'desc');
     }
 
 
