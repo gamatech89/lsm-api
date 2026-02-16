@@ -148,5 +148,56 @@ class AuthController extends Controller
             422
         );
     }
+
+    /**
+     * Update the authenticated user's profile.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $request->user()->id,
+        ]);
+
+        $user = $request->user();
+        $user->update($request->only(['name', 'email']));
+
+        return $this->successResponse(
+            new UserResource($user->fresh()),
+            'Profile updated successfully'
+        );
+    }
+
+    /**
+     * Update the authenticated user's billing information.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function updateBilling(Request $request): JsonResponse
+    {
+        $request->validate([
+            'billing_company_name' => 'nullable|string|max:255',
+            'billing_address' => 'nullable|string|max:1000',
+            'billing_tax_id' => 'nullable|string|max:100',
+            'invoice_prefix' => 'nullable|string|max:10',
+        ]);
+
+        $user = $request->user();
+        $user->update($request->only([
+            'billing_company_name',
+            'billing_address',
+            'billing_tax_id',
+            'invoice_prefix',
+        ]));
+
+        return $this->successResponse(
+            new UserResource($user->fresh()),
+            'Billing information updated successfully'
+        );
+    }
 }
 

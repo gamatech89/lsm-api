@@ -205,4 +205,80 @@ class InvoiceController extends Controller
 
         return $this->success($invoices);
     }
+
+    /**
+     * Download invoice as PDF
+     */
+    public function downloadPdf(Invoice $invoice)
+    {
+        $user = Auth::user();
+
+        // Check access - owner or admin/manager
+        if ($invoice->user_id !== $user->id && !in_array($user->role, ['admin', 'manager'])) {
+            return $this->forbidden();
+        }
+
+        $invoice->load(['user', 'entries.project', 'entries.todo']);
+        $invoiceUser = $invoice->user;
+
+        // Group entries by project for line items
+        $grouped = $invoice->entries->groupBy('project_id');
+        $lineItems = [];
+
+        foreach ($grouped as $projectId => $entries) {
+            $project = $entries->first()->project;
+            $totalMinutes = $entries->sum('duration_minutes');
+            $hours = $totalMinutes / 60;
+
+            // Get the rate: use entry-level rate, fallback to user rate
+            $rate = $entries->first()->hourly_rate ?? $invoiceUser->hourly_rate ?? 0;
+            $amount = $hours * $rate;
+
+            // Collect unique task names
+            $tasks = $entries
+                ->filter(fn($e) => $e->todo)
+                ->pluck('todo.title')
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $lineItems[] = [
+                'description' => $project ? ('Development – ' . $project->name) : 'Development',
+                'project_url' => $project->url ?? null,
+                'project_slug' => $project ? str_replace(['https://', 'http://'], '', $project->url ?? $project->name) : '',
+                'hours' => round($hours, 1),
+                'rate' => $rate,
+                'amount' => round($amount, 2),
+                'tasks' => $tasks,
+            ];
+        }
+
+        $subtotal = collect($lineItems)->sum('amount');
+        $taxRate = config('invoice.tax_rate', 0);
+        $taxAmount = $subtotal * ($taxRate / 100);
+        $total = $subtotal + $taxAmount;
+
+        $data = [
+            'invoice' => $invoice,
+            'user' => $invoiceUser,
+            'lineItems' => $lineItems,
+            'subtotal' => $subtotal,
+            'taxRate' => $taxRate,
+            'taxLabel' => config('invoice.tax_label', 'Tax'),
+            'taxAmount' => $taxAmount,
+            'total' => $total,
+            'currency' => config('invoice.currency_symbol', '$'),
+            'billTo' => [
+                'company_name' => config('invoice.company_name'),
+                'company_address' => config('invoice.company_address'),
+            ],
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.invoice_pdf', $data);
+        $pdf->setPaper('A4', 'portrait');
+
+        $filename = $invoice->invoice_number . '.pdf';
+
+        return $pdf->download($filename);
+    }
 }

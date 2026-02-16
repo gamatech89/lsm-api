@@ -30,6 +30,10 @@ class User extends Authenticatable
         'is_admin',
         'last_login_at',
         'hourly_rate',
+        'billing_company_name',
+        'billing_address',
+        'billing_tax_id',
+        'invoice_prefix',
     ];
 
     /**

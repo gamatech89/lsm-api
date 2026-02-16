@@ -50,6 +50,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/logout', [V1\AuthController::class, 'logout'])->name('logout');
         Route::post('/logout-all', [V1\AuthController::class, 'logoutAll'])->name('logout-all');
         Route::get('/user', [V1\AuthController::class, 'user'])->name('user');
+        Route::put('/user/profile', [V1\AuthController::class, 'updateProfile'])->name('user.update-profile');
+        Route::put('/user/billing', [V1\AuthController::class, 'updateBilling'])->name('user.update-billing');
         Route::post('/refresh-token', [V1\AuthController::class, 'refresh'])->name('refresh');
 
         // -------------------------------------------------
@@ -360,6 +362,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/{invoice}/approve', [V1\InvoiceController::class, 'approve'])->name('approve');
             Route::post('/{invoice}/decline', [V1\InvoiceController::class, 'decline'])->name('decline');
             Route::post('/{invoice}/mark-paid', [V1\InvoiceController::class, 'markAsPaid'])->name('mark-paid');
+            Route::get('/{invoice}/download-pdf', [V1\InvoiceController::class, 'downloadPdf'])->name('download-pdf');
         });
     });
 });
