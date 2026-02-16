@@ -163,6 +163,20 @@ class SecurityScanController extends Controller
     }
 
     /**
+     * Delete a security scan.
+     */
+    public function destroy(Project $project, SecurityScan $securityScan): JsonResponse
+    {
+        if ($securityScan->project_id !== $project->id) {
+            return response()->json(['success' => false, 'message' => 'Scan does not belong to this project.'], 403);
+        }
+
+        $securityScan->delete();
+
+        return response()->json(['success' => true, 'message' => 'Scan deleted.']);
+    }
+
+    /**
      * Send notification when threats are detected.
      */
     protected function notifyThreatsDetected(Project $project, SecurityScan $scan): void

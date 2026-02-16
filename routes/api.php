@@ -162,6 +162,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/security-scans/latest', [V1\SecurityScanController::class, 'latest'])->name('security-scans.latest');
             Route::get('/security-scans/stats', [V1\SecurityScanController::class, 'stats'])->name('security-scans.stats');
             Route::get('/security-scans/{securityScan}', [V1\SecurityScanController::class, 'show'])->name('security-scans.show');
+            Route::delete('/security-scans/{securityScan}', [V1\SecurityScanController::class, 'destroy'])->name('security-scans.destroy');
         });
 
         // -------------------------------------------------
