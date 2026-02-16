@@ -97,19 +97,19 @@ class ProjectPolicy
 
     /**
      * Determine whether the user can manage credentials for this project.
+     * Only admins and project managers can manage credentials.
      */
     public function manageCredentials(User $user, Project $project): bool
     {
+        if ($user->role === 'admin' || $user->is_admin) {
+            return true;
+        }
+
         if ($user->role === 'manager') {
             return $project->managers->contains('id', $user->id);
         }
-        
-        if ($user->role === 'developer') {
-            // Check both legacy single developer and many-to-many relationship
-            return $project->developer_id === $user->id 
-                || $project->developers()->where('user_id', $user->id)->exists();
-        }
-        
+
+        // Developers cannot manage credentials
         return false;
     }
 
