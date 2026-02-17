@@ -317,6 +317,7 @@ class CheckSiteUptime extends Command
 
     /**
      * Send site down notification to project team members.
+     * Includes a cooldown to prevent notification spam during prolonged outages.
      */
     protected function sendSiteDownNotification(Project $project, string $errorType, string $errorMessage, ?int $httpStatus = null): void
     {
@@ -326,6 +327,18 @@ class CheckSiteUptime extends Command
 
         if (empty($siteDown['enabled'])) {
             return;
+        }
+
+        // ── Cooldown: only send one notification per project per hour ──
+        // Check if a SiteDownNotification was already sent for this project recently.
+        $recentNotification = \Illuminate\Support\Facades\DB::table('notifications')
+            ->where('type', SiteDownNotification::class)
+            ->where('data->project_id', $project->id)
+            ->where('created_at', '>=', now()->subHour())
+            ->exists();
+
+        if ($recentNotification) {
+            return; // Already notified within the last hour — skip
         }
 
         // Collect team members
