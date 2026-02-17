@@ -34,7 +34,8 @@ class TimeEntryController extends Controller
             ->orderByDesc('started_at');
 
         // Check if admin/manager wants all users' entries
-        $showAllUsers = $request->boolean('all_users') && in_array($user->role, ['admin', 'manager']);
+        // Also auto-show all users when filtering by todo_id (admins/managers need to see dev time on todos)
+        $showAllUsers = in_array($user->role, ['admin', 'manager']) && ($request->boolean('all_users') || $request->todo_id);
         
         if ($showAllUsers) {
             // Admins and managers can see all entries

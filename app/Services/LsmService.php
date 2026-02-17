@@ -442,22 +442,26 @@ class LsmService
     // =========================================================================
 
     /**
-     * Run a full security scan on the WordPress site.
+     * Run a security scan on the WordPress site.
      *
      * @param array|null $modules Specific modules to run (null = all)
+     * @param string     $scanType Scan tier: 'quick', 'standard', or 'full'
      */
-    public function runSecurityScan(?array $modules = null): ?array
+    public function runSecurityScan(?array $modules = null, string $scanType = 'full'): ?array
     {
         if (!$this->isConfigured()) return null;
 
         try {
             $url = $this->baseUrl . '/security/scan?key=' . $this->apiKey;
-            $data = [];
+            $data = ['scan_type' => $scanType];
             if ($modules) {
                 $data['modules'] = implode(',', $modules);
             }
 
-            $response = Http::timeout(120) // Extended timeout for scans
+            $timeouts = ['quick' => 60, 'standard' => 180, 'full' => 600];
+            $timeout = $timeouts[$scanType] ?? 180;
+
+            $response = Http::timeout($timeout)
                 ->withOptions(['allow_redirects' => true])
                 ->asJson()
                 ->post($url, $data);

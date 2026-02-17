@@ -47,7 +47,7 @@ class SecurityScanController extends Controller
     public function scan(Project $project, Request $request): JsonResponse
     {
         $request->validate([
-            'scan_type' => 'in:full,quick',
+            'scan_type' => 'in:full,standard,quick',
             'modules' => 'nullable|string',
         ]);
 
@@ -71,14 +71,14 @@ class SecurityScanController extends Controller
             'started_at' => now(),
         ]);
 
-        // Run the scan via WP plugin API
+        // Run the scan via WP plugin API — all types go through the main endpoint with scan_type param
         if ($scanType === 'quick') {
             $results = $lsm->runQuickScan();
         } else {
             $modules = $request->input('modules')
                 ? explode(',', $request->input('modules'))
                 : null;
-            $results = $lsm->runSecurityScan($modules);
+            $results = $lsm->runSecurityScan($modules, $scanType);
         }
 
         if (!$results) {
