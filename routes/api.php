@@ -38,6 +38,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::post('/webhooks/support-ticket', [V1\SupportTicketController::class, 'receiveFromPlugin'])
         ->name('webhooks.support-ticket');
 
+    // WP PLUGIN UPDATE CHECK (Public - used by WP updater since GitHub may be blocked on hosting)
+    Route::get('/plugin/latest-release', [V1\PluginReleaseController::class, 'latestRelease'])
+        ->middleware('throttle:30,1')
+        ->name('plugin.latest-release');
+
     // =====================================================
     // PROTECTED ROUTES (Requires Sanctum authentication)
     // =====================================================
