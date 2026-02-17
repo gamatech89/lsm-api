@@ -11,6 +11,7 @@ class LsmService
 {
     protected const API_NAMESPACE = '/wp-json/lsm/v1';
     protected const DEFAULT_TIMEOUT = 30;
+    protected const UPDATE_TIMEOUT = 120;
 
     protected Project $project;
     protected ?string $apiKey;
@@ -184,13 +185,13 @@ class LsmService
     
     public function updateCore(): ?array
     {
-        return $this->post('/updates/core');
+        return $this->post('/updates/core', [], self::UPDATE_TIMEOUT);
     }
     
     public function updatePlugins(): ?array 
     {
         // Updates all plugins
-         return $this->post('/updates/plugins');
+         return $this->post('/updates/plugins', [], self::UPDATE_TIMEOUT);
     }
 
     /**
@@ -198,7 +199,7 @@ class LsmService
      */
     public function updatePlugin(string $slug): ?array
     {
-        return $this->post('/plugins/update', ['slug' => $slug]);
+        return $this->post('/plugins/update', ['slug' => $slug], self::UPDATE_TIMEOUT);
     }
 
     /**
@@ -536,7 +537,7 @@ class LsmService
         }
     }
 
-    protected function post(string $endpoint, array $data = []): ?array
+    protected function post(string $endpoint, array $data = [], ?int $timeout = null): ?array
     {
         if (!$this->isConfigured()) return null;
 
@@ -544,7 +545,7 @@ class LsmService
             // Add key via query param for authentication (LSM supports it)
             $url = $this->baseUrl . $endpoint . '?key=' . $this->apiKey;
             
-            $response = Http::timeout(self::DEFAULT_TIMEOUT)
+            $response = Http::timeout($timeout ?? self::DEFAULT_TIMEOUT)
                 ->withOptions(['allow_redirects' => true])
                 ->asJson() // Ensure JSON content type
                 ->post($url, $data);
