@@ -496,6 +496,29 @@ class LsmService
     }
 
     /**
+     * Get current scan progress from the WordPress site.
+     * Lightweight endpoint that reads a transient — safe to poll frequently.
+     */
+    public function getScanProgress(): ?array
+    {
+        if (!$this->isConfigured()) return null;
+
+        try {
+            $params = ['key' => $this->apiKey];
+
+            $response = Http::timeout(5)
+                ->withOptions(['allow_redirects' => true])
+                ->get($this->baseUrl . '/security/scan/progress', $params);
+
+            $json = $response->json();
+            return $json ?? null;
+        } catch (\Exception $e) {
+            // Don't log polling errors — they're noise
+            return null;
+        }
+    }
+
+    /**
      * Legacy alias for backwards compatibility.
      * @deprecated Use getPhpErrors() instead
      */

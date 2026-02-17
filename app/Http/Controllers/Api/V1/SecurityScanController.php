@@ -46,6 +46,9 @@ class SecurityScanController extends Controller
      */
     public function scan(Project $project, Request $request): JsonResponse
     {
+        // Remove PHP execution time limit — full scans can take 5+ minutes
+        set_time_limit(0);
+
         $request->validate([
             'scan_type' => 'in:full,standard,quick',
             'modules' => 'nullable|string',
@@ -140,6 +143,31 @@ class SecurityScanController extends Controller
         return response()->json([
             'success' => true,
             'data' => $scan,
+        ]);
+    }
+
+    /**
+     * Get real-time scan progress from the WP plugin.
+     * This is a lightweight proxy that reads a transient — safe to poll every 2s.
+     */
+    public function progress(Project $project): JsonResponse
+    {
+        $lsm = LsmService::for($project);
+
+        if (!$lsm->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'scanning' => false,
+                'message' => 'LSM plugin is not configured.',
+            ]);
+        }
+
+        $progress = $lsm->getScanProgress();
+
+        return response()->json($progress ?? [
+            'success' => true,
+            'scanning' => false,
+            'data' => null,
         ]);
     }
 
