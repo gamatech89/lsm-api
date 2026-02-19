@@ -34,6 +34,12 @@ class TodoResource extends JsonResource
             'file_name' => $this->file_name,
             'has_attachment' => !empty($this->file_path),
             
+            // Linked library resources
+            'library_resources' => LibraryResourceResource::collection($this->whenLoaded('libraryResources')),
+
+            // Time estimate
+            'estimated_minutes' => $this->estimated_minutes,
+            
             // Assignee
             'assignee_id' => $this->assignee_id,
             'assignee' => new UserResource($this->whenLoaded('assignee')),

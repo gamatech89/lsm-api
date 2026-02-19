@@ -154,6 +154,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             // Site Info & Stats
             Route::get('/site-info', [V1\LsmController::class, 'getSiteInfo'])->name('site-info');
             Route::get('/users', [V1\LsmController::class, 'getUsers'])->name('users');
+            Route::post('/sync-wp-accounts', [V1\LsmController::class, 'syncWpAccounts'])->name('sync-wp-accounts');
             
             // Security Settings
             Route::get('/security-settings', [V1\LsmController::class, 'getSecuritySettings'])->name('security-settings');

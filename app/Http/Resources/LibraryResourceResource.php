@@ -17,7 +17,9 @@ class LibraryResourceResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
+            'type' => $this->type ?? 'file',
             'category' => $this->category,
+            'url' => $this->url,
             'file_path' => $this->file_path,
             'file_name' => $this->file_name,
             'file_size' => $this->file_size,

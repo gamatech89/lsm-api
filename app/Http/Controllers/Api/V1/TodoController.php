@@ -56,7 +56,7 @@ class TodoController extends Controller
     {
         Gate::authorize('view', $project);
 
-        $query = $project->todos()->with('assignee:id,name,email');
+        $query = $project->todos()->with(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
 
         // Filter by status
         if ($request->filled('status')) {
@@ -101,7 +101,7 @@ class TodoController extends Controller
     {
         Gate::authorize('view', $todo->project);
 
-        $todo->load('assignee:id,name,email');
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
 
         return new TodoResource($todo);
     }
@@ -126,6 +126,8 @@ class TodoController extends Controller
             'assignee_id' => 'nullable|exists:users,id',
             'file' => 'nullable|file|max:10240', // 10MB max
             'estimated_minutes' => 'nullable|integer|min:0',
+            'library_resource_ids' => 'nullable|array',
+            'library_resource_ids.*' => 'exists:library_resources,id',
         ]);
 
         $validated['project_id'] = $project->id;
@@ -138,8 +140,16 @@ class TodoController extends Controller
             $validated['file_name'] = $file->getClientOriginalName();
         }
 
+        unset($validated['library_resource_ids']);
+
         $todo = Todo::create($validated);
-        $todo->load('assignee:id,name,email');
+
+        // Sync library resources if provided
+        if ($request->has('library_resource_ids')) {
+            $todo->libraryResources()->sync($request->input('library_resource_ids', []));
+        }
+
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
 
         // Notify assignee if set and not the creator (optional check, but good practice)
         // Here we just check if assignee exists
@@ -175,6 +185,8 @@ class TodoController extends Controller
             'assignee_id' => 'nullable|exists:users,id',
             'file' => 'nullable|file|max:10240',
             'estimated_minutes' => 'nullable|integer|min:0',
+            'library_resource_ids' => 'nullable|array',
+            'library_resource_ids.*' => 'exists:library_resources,id',
         ]);
 
         // Handle completed status
@@ -196,7 +208,13 @@ class TodoController extends Controller
             $validated['file_name'] = $file->getClientOriginalName();
         }
 
+        unset($validated['library_resource_ids']);
         $todo->update($validated);
+
+        // Sync library resources if provided
+        if ($request->has('library_resource_ids')) {
+            $todo->libraryResources()->sync($request->input('library_resource_ids', []));
+        }
 
         // Notify if assignee changed and is set
         if ($todo->wasChanged('assignee_id') && $todo->assignee_id) {
@@ -204,7 +222,7 @@ class TodoController extends Controller
             $todo->assignee->notify(new \App\Notifications\TodoAssignedNotification($todo));
         }
 
-        $todo->load('assignee:id,name,email');
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
 
         return new TodoResource($todo);
     }

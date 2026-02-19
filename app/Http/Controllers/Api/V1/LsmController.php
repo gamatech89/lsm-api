@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncWpAccountsJob;
 use App\Models\Project;
 use App\Services\LsmService;
 use Illuminate\Http\JsonResponse;
@@ -962,5 +963,32 @@ class LsmController extends Controller
         }
 
         return response()->json($result);
+    }
+
+    // =========================================================================
+    // WP ACCOUNT SYNC
+    // =========================================================================
+
+    /**
+     * Manually trigger a full sync of WordPress user accounts.
+     * Creates WP accounts for all assigned team members and
+     * removes accounts for users no longer assigned.
+     */
+    public function syncWpAccounts(Project $project): JsonResponse
+    {
+        Gate::authorize('update', $project);
+
+        $lsm = LsmService::for($project);
+
+        if (!$lsm->isConfigured()) {
+            return response()->json(['error' => 'LSM not configured'], 400);
+        }
+
+        SyncWpAccountsJob::dispatch($project, [], [], true);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'WP account sync has been queued. Accounts will be synced shortly.',
+        ]);
     }
 }

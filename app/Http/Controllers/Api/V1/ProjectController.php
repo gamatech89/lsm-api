@@ -7,6 +7,7 @@ use App\Http\Requests\Api\UpdateProjectRequest;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\TagResource;
 use App\Http\Resources\UserResource;
+use App\Jobs\SyncWpAccountsJob;
 use App\Models\Project;
 use App\Models\Tag;
 use App\Models\Todo;
@@ -251,6 +252,12 @@ class ProjectController extends Controller
 
         $project->load(['manager', 'managers', 'developers', 'tags']);
 
+        // Dispatch WP account sync if team members were assigned
+        $allTeamIds = array_merge($developerIds, $managerIds);
+        if (!empty($allTeamIds) && $project->health_check_secret) {
+            SyncWpAccountsJob::dispatch($project, $allTeamIds, [], false);
+        }
+
         return $this->createdResponse(
             new ProjectResource($project),
             'Project created successfully'
@@ -331,6 +338,24 @@ class ProjectController extends Controller
             }
         }
 
+        // Dispatch WP account sync if team members changed
+        if ($project->health_check_secret) {
+            // Force-reload relationships to get fresh data after sync() calls
+            $project->load(['managers', 'developers']);
+
+            $currentManagerIds = $project->managers->pluck('id')->toArray();
+            $currentDeveloperIds = $project->developers->pluck('id')->toArray();
+            $currentTeamIds = array_unique(array_merge($currentManagerIds, $currentDeveloperIds));
+            $oldTeamIds = array_unique(array_merge($oldManagerIds, $oldDeveloperIds));
+
+            $addedUserIds = array_values(array_diff($currentTeamIds, $oldTeamIds));
+            $removedUserIds = array_values(array_diff($oldTeamIds, $currentTeamIds));
+
+            if (!empty($addedUserIds) || !empty($removedUserIds)) {
+                SyncWpAccountsJob::dispatch($project, $addedUserIds, $removedUserIds);
+            }
+        }
+
         // Notify team of status changes
         $this->notifyStatusChanges($project, $oldHealthStatus, $oldSecurityStatus);
 
@@ -405,6 +430,13 @@ class ProjectController extends Controller
                     'response_time_ms' => $responseTime,
                     'checked_at' => now(),
                 ]);
+
+                // After successful health check, sync WP accounts if team members exist
+                // This handles the edge case where plugin was connected after team assignment
+                $hasTeam = $project->developers()->exists() || $project->managers()->exists();
+                if ($hasTeam) {
+                    SyncWpAccountsJob::dispatch($project, [], [], true);
+                }
 
                 return $this->successResponse([
                     'health_data' => $healthData,

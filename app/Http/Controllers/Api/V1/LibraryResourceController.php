@@ -27,6 +27,11 @@ class LibraryResourceController extends Controller
             ->with('creator:id,name')
             ->withCount('projects');
 
+        // Filter by type (file or link)
+        if ($request->has('type')) {
+            $query->where('type', $request->type);
+        }
+
         // Filter by category
         if ($request->has('category')) {
             $query->where('category', $request->category);
@@ -47,25 +52,41 @@ class LibraryResourceController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $type = $request->input('type', 'file');
+
+        $rules = [
             'title' => 'required|string|max:255',
+            'type' => 'sometimes|in:file,link',
             'category' => 'nullable|string|max:100',
-            'file' => 'required|file|max:51200', // 50MB max
             'notes' => 'nullable|string',
-        ]);
+        ];
 
-        $file = $request->file('file');
-        $path = $file->store('library', 'local');
+        if ($type === 'link') {
+            $rules['url'] = 'required|url|max:2048';
+        } else {
+            $rules['file'] = 'required|file|max:51200'; // 50MB max
+        }
 
-        $resource = LibraryResource::create([
+        $validated = $request->validate($rules);
+
+        $data = [
             'title' => $validated['title'],
+            'type' => $type,
             'category' => $validated['category'] ?? null,
-            'file_path' => $path,
-            'file_name' => $file->getClientOriginalName(),
-            'file_size' => $file->getSize(),
             'notes' => $validated['notes'] ?? null,
             'created_by' => Auth::id(),
-        ]);
+        ];
+
+        if ($type === 'link') {
+            $data['url'] = $validated['url'];
+        } else {
+            $file = $request->file('file');
+            $data['file_path'] = $file->store('library', 'local');
+            $data['file_name'] = $file->getClientOriginalName();
+            $data['file_size'] = $file->getSize();
+        }
+
+        $resource = LibraryResource::create($data);
 
         return $this->createdResponse(
             new LibraryResourceResource($resource),
@@ -89,20 +110,43 @@ class LibraryResourceController extends Controller
      */
     public function update(Request $request, LibraryResource $libraryResource): LibraryResourceResource
     {
-        $validated = $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'category' => 'nullable|string|max:100',
-            'file' => 'nullable|file|max:51200',
-            'notes' => 'nullable|string',
-        ]);
+        $type = $request->input('type', $libraryResource->type ?? 'file');
 
-        // Handle file replacement
-        if ($request->hasFile('file')) {
-            // Delete old file
+        $rules = [
+            'title' => 'sometimes|required|string|max:255',
+            'type' => 'sometimes|in:file,link',
+            'category' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+        ];
+
+        if ($type === 'link') {
+            $rules['url'] = 'sometimes|required|url|max:2048';
+        } else {
+            $rules['file'] = 'nullable|file|max:51200';
+        }
+
+        $validated = $request->validate($rules);
+
+        // If switching from file to link, clean up old file
+        if ($type === 'link' && $libraryResource->isFile()) {
             if ($libraryResource->file_path && Storage::disk('local')->exists($libraryResource->file_path)) {
                 Storage::disk('local')->delete($libraryResource->file_path);
             }
+            $validated['file_path'] = null;
+            $validated['file_name'] = null;
+            $validated['file_size'] = null;
+        }
 
+        // If switching from link to file, clear URL
+        if ($type === 'file' && $libraryResource->isLink()) {
+            $validated['url'] = null;
+        }
+
+        // Handle file replacement/upload
+        if ($request->hasFile('file')) {
+            if ($libraryResource->file_path && Storage::disk('local')->exists($libraryResource->file_path)) {
+                Storage::disk('local')->delete($libraryResource->file_path);
+            }
             $file = $request->file('file');
             $validated['file_path'] = $file->store('library', 'local');
             $validated['file_name'] = $file->getClientOriginalName();
@@ -110,6 +154,7 @@ class LibraryResourceController extends Controller
         }
 
         unset($validated['file']);
+        $validated['type'] = $type;
         $libraryResource->update($validated);
 
         return new LibraryResourceResource($libraryResource);
@@ -125,8 +170,9 @@ class LibraryResourceController extends Controller
             Storage::disk('local')->delete($libraryResource->file_path);
         }
 
-        // Detach from all projects first
+        // Detach from all projects and todos first
         $libraryResource->projects()->detach();
+        $libraryResource->todos()->detach();
         
         $libraryResource->delete();
 

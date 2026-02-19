@@ -10,8 +10,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * Library Resource Model
  * 
- * Represents globally shared files that can be linked to multiple projects.
- * Examples: Dev guides, security checklists, onboarding documents.
+ * Represents globally shared resources that can be linked to multiple projects.
+ * Supports two types:
+ *   - 'file': Uploaded files (dev guides, security checklists, etc.)
+ *   - 'link': External URLs (Loom videos, documentation, etc.)
  */
 class LibraryResource extends Model
 {
@@ -19,7 +21,9 @@ class LibraryResource extends Model
 
     protected $fillable = [
         'title',
+        'type',
         'category',
+        'url',
         'file_path',
         'file_name',
         'file_size',
@@ -49,6 +53,31 @@ class LibraryResource extends Model
     }
 
     /**
+     * Get the todos that reference this library resource.
+     */
+    public function todos(): BelongsToMany
+    {
+        return $this->belongsToMany(Todo::class, 'todo_library_resource')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if this is a link-type resource.
+     */
+    public function isLink(): bool
+    {
+        return $this->type === 'link';
+    }
+
+    /**
+     * Check if this is a file-type resource.
+     */
+    public function isFile(): bool
+    {
+        return $this->type === 'file';
+    }
+
+    /**
      * Get formatted file size.
      */
     public function getFormattedFileSizeAttribute(): string
@@ -66,3 +95,4 @@ class LibraryResource extends Model
         return $bytes . ' B';
     }
 }
+

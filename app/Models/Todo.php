@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -47,6 +48,15 @@ class Todo extends Model
     public function timeEntries(): HasMany
     {
         return $this->hasMany(TimeEntry::class);
+    }
+
+    /**
+     * Get the library resources linked to this todo.
+     */
+    public function libraryResources(): BelongsToMany
+    {
+        return $this->belongsToMany(LibraryResource::class, 'todo_library_resource')
+            ->withTimestamps();
     }
 
     /**

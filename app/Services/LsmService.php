@@ -262,10 +262,14 @@ class LsmService
 
     public function generateLoginToken(string $role = 'administrator'): ?array
     {
+        $user = auth()->user();
+
         return $this->post('/sso/token', [
             'role' => $role,
             'bind_ip' => request()->ip(),
-            'dashboard_user' => auth()->user() ? auth()->user()->email : 'system',
+            'dashboard_user' => $user ? $user->email : 'system',
+            'email' => $user ? $user->email : null,
+            'display_name' => $user ? $user->name : null,
         ]);
     }
 
@@ -404,6 +408,48 @@ class LsmService
     public function getUsers(): ?array
     {
         return $this->get('/users/list');
+    }
+
+    /**
+     * Create a WordPress user for an LSM Platform team member.
+     */
+    public function createWpUser(\App\Models\User $user, string $role = 'administrator'): ?array
+    {
+        return $this->post('/users/create', [
+            'email' => $user->email,
+            'display_name' => $user->name,
+            'role' => $role,
+            'platform_user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * Delete a WordPress user by email.
+     */
+    public function deleteWpUser(string $email): ?array
+    {
+        return $this->post('/users/delete', [
+            'email' => $email,
+        ]);
+    }
+
+    /**
+     * Sync WordPress users with a list of platform users.
+     *
+     * @param \App\Models\User[] $users
+     */
+    public function syncWpUsers(array $users): ?array
+    {
+        $userData = array_map(fn($user) => [
+            'email' => $user->email,
+            'display_name' => $user->name,
+            'role' => 'administrator',
+            'platform_user_id' => $user->id,
+        ], $users);
+
+        return $this->post('/users/sync', [
+            'users' => $userData,
+        ]);
     }
 
     /**
