@@ -73,7 +73,7 @@ class CheckSiteUptime extends Command
         $this->info("Checking {$projects->count()} project(s) with concurrency of {$concurrency}...");
         
         // Process in batches for parallel execution
-        $results = ['up' => 0, 'down' => 0, 'error' => 0, 'redirect' => 0];
+        $results = ['up' => 0, 'down' => 0, 'error' => 0];
         $batches = $projects->chunk($concurrency);
 
         foreach ($batches as $batch) {
@@ -85,7 +85,7 @@ class CheckSiteUptime extends Command
 
         $duration = round(now()->floatDiffInSeconds($startTime), 1);
         $this->newLine();
-        $this->info("Completed in {$duration}s: ✅ {$results['up']} up, ⚠️ {$results['redirect']} redirects, ❌ {$results['down']} down, 💥 {$results['error']} errors");
+        $this->info("Completed in {$duration}s: ✅ {$results['up']} up, ❌ {$results['down']} down, 💥 {$results['error']} errors");
 
         // Return non-zero if any sites are down
         return ($results['down'] + $results['error']) > 0 ? 1 : 0;
@@ -107,7 +107,12 @@ class CheckSiteUptime extends Command
 
                 $pool->as($index)
                     ->timeout($timeout)
-                    ->withOptions(['allow_redirects' => false])
+                    ->withOptions([
+                        'allow_redirects' => [
+                            'max' => 5,
+                            'track_redirects' => true,
+                        ],
+                    ])
                     ->get($healthUrl);
             }
         });
@@ -145,31 +150,20 @@ class CheckSiteUptime extends Command
             $responseTime = round($transferStats->getTransferTime() * 1000);
         }
 
-        // Check for redirects (3xx status codes)
-        if ($httpStatus >= 300 && $httpStatus < 400) {
-            $redirectLocation = $response->header('Location') ?? 'unknown';
-            
-            $this->logCheck($project, 'redirect', $httpStatus, $responseTime, "Redirecting to: {$redirectLocation}");
-            
-            // Update project status
-            $project->update([
-                'last_health_check_at' => now(),
-                'response_time_ms' => $responseTime,
-                'health_status' => 'down_error',
-                'last_health_details' => [
-                    'error' => true,
-                    'error_type' => 'redirect',
-                    'redirect_to' => $redirectLocation,
-                    'http_status' => $httpStatus,
-                    'checked_at' => now()->toIso8601String(),
-                ],
-            ]);
-
-            if ($this->getOutput()->isVerbose()) {
-                $this->warn("⚠️ {$project->name}: Redirect ({$httpStatus}) -> {$redirectLocation}");
+        // Auto-correct project URL if a redirect was followed
+        // (e.g. www -> non-www, http -> https)
+        $redirectHistory = $response->header('X-Guzzle-Redirect-History');
+        if ($redirectHistory) {
+            $effectiveUrl = $transferStats?->getEffectiveUri();
+            if ($effectiveUrl) {
+                $effectiveBase = parse_url((string) $effectiveUrl, PHP_URL_SCHEME) 
+                    . '://' . parse_url((string) $effectiveUrl, PHP_URL_HOST);
+                $currentBase = rtrim($project->url, '/');
+                if ($effectiveBase && $effectiveBase !== $currentBase) {
+                    $project->url = $effectiveBase;
+                    Log::info("Auto-corrected URL for {$project->name}: {$currentBase} → {$effectiveBase}");
+                }
             }
-            
-            return 'redirect';
         }
 
         // Check for errors (4xx, 5xx)
