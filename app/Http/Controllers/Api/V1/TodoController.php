@@ -32,7 +32,6 @@ class TodoController extends Controller
             ->where('status', '!=', 'completed')
             ->orderByRaw("
                 CASE priority 
-                    WHEN 'urgent' THEN 1 
                     WHEN 'critical' THEN 1
                     WHEN 'high' THEN 2 
                     WHEN 'medium' THEN 3 
@@ -80,7 +79,6 @@ class TodoController extends Controller
 
         $todos = $query->orderByRaw("
             CASE priority 
-                WHEN 'urgent' THEN 1 
                 WHEN 'critical' THEN 1
                 WHEN 'high' THEN 2 
                 WHEN 'medium' THEN 3 
@@ -120,7 +118,7 @@ class TodoController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'priority' => 'required|in:low,medium,high,urgent,critical',
+            'priority' => 'required|in:low,medium,high,critical',
             'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
             'due_date' => 'nullable|date',
             'assignee_id' => 'nullable|exists:users,id',
@@ -178,7 +176,7 @@ class TodoController extends Controller
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
-            'priority' => 'sometimes|in:low,medium,high,urgent,critical',
+            'priority' => 'sometimes|in:low,medium,high,critical',
             'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
             'completed' => 'sometimes|boolean',
             'due_date' => 'nullable|date',
