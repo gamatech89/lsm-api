@@ -63,7 +63,7 @@ class BackupFailedNotification extends Notification implements ShouldQueue
             ->line("**Backup Info:**")
             ->line("- **Type:** " . ucfirst($this->backup->type))
             ->line("- **Attempted:** " . $this->backup->started_at?->format('M d, Y H:i'))
-            ->action('View Project', url("/projects/{$project->id}"))
+            ->action('View Project', config('app.frontend_url') . "/projects/{$project->id}"))
             ->line('Please investigate and retry the backup if necessary.');
     }
 
@@ -79,7 +79,7 @@ class BackupFailedNotification extends Notification implements ShouldQueue
             ->content("❌ Backup failed for {$project->name}")
             ->attachment(function ($attachment) use ($project) {
                 $attachment
-                    ->title($project->name, url("/projects/{$project->id}"))
+                    ->title($project->name, config('app.frontend_url') . "/projects/{$project->id}"))
                     ->fields([
                         'Type' => ucfirst($this->backup->type),
                         'Error' => substr($this->error, 0, 200),

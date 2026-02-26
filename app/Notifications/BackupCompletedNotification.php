@@ -59,7 +59,7 @@ class BackupCompletedNotification extends Notification implements ShouldQueue
             ->when($this->backup->includes_database, fn($mail) => $mail->line("- ✓ Includes database"))
             ->when($this->backup->includes_files, fn($mail) => $mail->line("- ✓ Includes files"))
             ->when($this->backup->includes_uploads, fn($mail) => $mail->line("- ✓ Includes uploads"))
-            ->action('View Backup', url("/projects/{$project->id}/backups"))
+            ->action('View Backup', config('app.frontend_url') . "/projects/{$project->id}/backups"))
             ->line('The backup is now available for download.');
     }
 
@@ -76,7 +76,7 @@ class BackupCompletedNotification extends Notification implements ShouldQueue
             ->content("✅ Backup completed for {$project->name}")
             ->attachment(function ($attachment) use ($project, $size) {
                 $attachment
-                    ->title($project->name, url("/projects/{$project->id}/backups"))
+                    ->title($project->name, config('app.frontend_url') . "/projects/{$project->id}/backups"))
                     ->fields([
                         'Type' => ucfirst($this->backup->type),
                         'Size' => $size,
