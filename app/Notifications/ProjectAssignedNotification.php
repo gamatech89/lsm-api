@@ -32,7 +32,7 @@ class ProjectAssignedNotification extends Notification implements ShouldQueue
             ->line("You have been assigned as the **{$roleLabel}** for the following project:")
             ->line("**Project:** {$this->project->name}")
             ->line("**URL:** " . ($this->project->url ?: 'Not specified'))
-            ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}"))
+            ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}")
             ->line('Thank you for being part of the team!');
     }
 
