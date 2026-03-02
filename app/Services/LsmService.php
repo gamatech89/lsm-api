@@ -247,6 +247,14 @@ class LsmService
     }
 
     /**
+     * Update a single theme.
+     */
+    public function updateTheme(string $slug): ?array
+    {
+        return $this->post('/themes/update', ['slug' => $slug], self::UPDATE_TIMEOUT);
+    }
+
+    /**
      * Switch to default theme.
      */
     public function switchTheme(): ?array

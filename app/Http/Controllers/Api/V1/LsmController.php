@@ -530,6 +530,30 @@ class LsmController extends Controller
     }
 
     /**
+     * Update a single theme.
+     */
+    public function updateTheme(Project $project, Request $request): JsonResponse
+    {
+        Gate::authorize('update', $project);
+
+        $request->validate(['slug' => 'required|string']);
+
+        $lsm = LsmService::for($project);
+
+        if (!$lsm->isConfigured()) {
+            return response()->json(['error' => 'LSM not configured'], 400);
+        }
+
+        $result = $lsm->updateTheme($request->input('slug'));
+
+        if (!$result) {
+            return response()->json(['error' => 'Failed to update theme'], 500);
+        }
+
+        return response()->json($result);
+    }
+
+    /**
      * Switch to default theme.
      */
     public function switchTheme(Project $project): JsonResponse
@@ -645,7 +669,7 @@ class LsmController extends Controller
 
         $result = $lsm->getPhpErrors($filters);
 
-        if (!$result) {
+        if ($result === null) {
             return response()->json(['error' => 'Failed to fetch PHP errors from WordPress'], 500);
         }
 

@@ -122,6 +122,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/update-plugin', [V1\LsmController::class, 'updatePlugin'])->name('update-plugin');
             Route::post('/update-all-plugins', [V1\LsmController::class, 'updateAllPlugins'])->name('update-all-plugins');
             Route::post('/update-core', [V1\LsmController::class, 'updateCore'])->name('update-core');
+            Route::post('/update-theme', [V1\LsmController::class, 'updateTheme'])->name('update-theme');
             
             // Plugin management
             Route::post('/activate-plugin', [V1\LsmController::class, 'activatePlugin'])->name('activate-plugin');
