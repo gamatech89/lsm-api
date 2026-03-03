@@ -35,7 +35,7 @@ class ProjectStatusChangedNotification extends Notification implements ShouldQue
             ->line("The **{$statusLabel}** for project **{$this->project->name}** has been updated:")
             ->line("**Previous Status:** {$this->oldStatus}")
             ->line("**New Status:** {$this->newStatus}")
-            ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}"))
+            ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}")
             ->line('Please review the project if necessary.');
     }
 

@@ -41,7 +41,7 @@ class TodoAddedNotification extends Notification implements ShouldQueue
             ->when($this->todo->due_date, function ($mail) {
                 return $mail->line("**Due Date:** {$this->todo->due_date->format('M d, Y')}");
             })
-            ->action('View Project', config('app.frontend_url') . "/projects/{$this->todo->project_id}"))
+            ->action('View Project', config('app.frontend_url') . "/projects/{$this->todo->project_id}")
             ->line('Please check the project for details.');
     }
 
