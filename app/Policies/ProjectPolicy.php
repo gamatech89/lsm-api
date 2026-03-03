@@ -30,11 +30,21 @@ class ProjectPolicy
 
     /**
      * Determine whether the user can view the model.
-     * All authenticated users can view project details.
+     * Users can only view projects they are assigned to.
      */
     public function view(User $user, Project $project): bool
     {
-        return true;
+        if ($user->role === 'manager') {
+            return $project->manager_id === $user->id
+                || $project->managers()->where('user_id', $user->id)->exists();
+        }
+
+        if ($user->role === 'developer') {
+            return $project->developer_id === $user->id
+                || $project->developers()->where('user_id', $user->id)->exists();
+        }
+
+        return false;
     }
 
     /**
