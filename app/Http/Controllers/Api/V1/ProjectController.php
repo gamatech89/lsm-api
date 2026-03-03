@@ -43,19 +43,20 @@ class ProjectController extends Controller
             ->withCount(['todos', 'credentials', 'resources', 'maintenanceReports'])
             ->withCount(['todos as pending_todos_count' => fn($q) => $q->where('status', '!=', 'completed')]);
 
-        // Role-based filtering
-        if ($user->role === 'developer') {
-            $query->where(function($q) use ($user) {
-                $q->where('developer_id', $user->id)
-                  ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
-            });
-        } elseif ($user->role === 'manager') {
-            $query->where(function($q) use ($user) {
-                $q->where('manager_id', $user->id)
-                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
-            });
+        // Role-based filtering (admins and is_admin users see all)
+        if (!$user->isAdmin()) {
+            if ($user->role === 'developer') {
+                $query->where(function($q) use ($user) {
+                    $q->where('developer_id', $user->id)
+                      ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
+                });
+            } elseif ($user->role === 'manager') {
+                $query->where(function($q) use ($user) {
+                    $q->where('manager_id', $user->id)
+                      ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+                });
+            }
         }
-        // Admin sees all
 
         // Filter by health status
         if ($request->filled('health') && $request->health !== 'all') {
@@ -126,17 +127,19 @@ class ProjectController extends Controller
             ->select('id', 'name', 'url', 'project_external_id', 'health_status')
             ->with(['tags:id,name,color']);
 
-        // Role-based filtering
-        if ($user->role === 'developer') {
-            $query->where(function($q) use ($user) {
-                $q->where('developer_id', $user->id)
-                  ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
-            });
-        } elseif ($user->role === 'manager') {
-            $query->where(function($q) use ($user) {
-                $q->where('manager_id', $user->id)
-                  ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
-            });
+        // Role-based filtering (admins and is_admin users see all)
+        if (!$user->isAdmin()) {
+            if ($user->role === 'developer') {
+                $query->where(function($q) use ($user) {
+                    $q->where('developer_id', $user->id)
+                      ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
+                });
+            } elseif ($user->role === 'manager') {
+                $query->where(function($q) use ($user) {
+                    $q->where('manager_id', $user->id)
+                      ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
+                });
+            }
         }
 
         // Search by name, URL (domain), external_id, or maint_id
