@@ -73,7 +73,7 @@ class CheckSiteUptime extends Command
         $this->info("Checking {$projects->count()} project(s) with concurrency of {$concurrency}...");
         
         // Process in batches for parallel execution
-        $results = ['up' => 0, 'down' => 0, 'error' => 0];
+        $results = ['up' => 0, 'down' => 0, 'error' => 0, 'confirming' => 0];
         $batches = $projects->chunk($concurrency);
 
         foreach ($batches as $batch) {
@@ -85,7 +85,7 @@ class CheckSiteUptime extends Command
 
         $duration = round(now()->floatDiffInSeconds($startTime), 1);
         $this->newLine();
-        $this->info("Completed in {$duration}s: ✅ {$results['up']} up, ❌ {$results['down']} down, 💥 {$results['error']} errors");
+        $this->info("Completed in {$duration}s: ✅ {$results['up']} up, ❌ {$results['down']} down, ⏳ {$results['confirming']} confirming, 💥 {$results['error']} errors");
 
         // Return non-zero if any sites are down
         return ($results['down'] + $results['error']) > 0 ? 1 : 0;
@@ -175,6 +175,33 @@ class CheckSiteUptime extends Command
                 $errorMessage = "Maintenance mode active";
             }
 
+            // Confirm-before-alert: only mark as down_error if already confirming
+            $isAlreadyFailing = in_array($project->health_status, ['confirming_down', 'down_error']);
+
+            if (!$isAlreadyFailing) {
+                // First failure — mark as confirming, do NOT notify
+                $project->update([
+                    'last_health_check_at' => now(),
+                    'response_time_ms' => $responseTime,
+                    'health_status' => 'confirming_down',
+                    'last_health_details' => [
+                        'error' => true,
+                        'error_type' => 'http_error',
+                        'http_status' => $httpStatus,
+                        'error_message' => $errorMessage,
+                        'checked_at' => now()->toIso8601String(),
+                    ],
+                ]);
+
+                $this->logCheck($project, 'confirming', $httpStatus, $responseTime, $errorMessage);
+
+                if ($this->getOutput()->isVerbose()) {
+                    $this->warn("⏳ {$project->name}: {$errorMessage} (confirming...)");
+                }
+
+                return 'confirming';
+            }
+
             $this->logCheck($project, 'down', $httpStatus, $responseTime, $errorMessage);
 
             $project->update([
@@ -194,7 +221,7 @@ class CheckSiteUptime extends Command
                 $this->error("❌ {$project->name}: {$errorMessage}");
             }
 
-            // Send site down notification
+            // Send site down notification (confirmed down)
             $this->sendSiteDownNotification($project, 'http_error', $errorMessage, $httpStatus);
 
             return 'down';
@@ -239,6 +266,32 @@ class CheckSiteUptime extends Command
             $errorMessage = $this->parseConnectionError($response->getMessage());
         }
 
+        // Confirm-before-alert: only mark as down_error if already confirming
+        $isAlreadyFailing = in_array($project->health_status, ['confirming_down', 'down_error']);
+
+        if (!$isAlreadyFailing) {
+            // First failure — mark as confirming, do NOT notify
+            $this->logCheck($project, 'confirming', null, null, $errorMessage);
+
+            $project->update([
+                'last_health_check_at' => now(),
+                'health_status' => 'confirming_down',
+                'last_health_details' => [
+                    'error' => true,
+                    'error_type' => 'connection_error',
+                    'error_message' => $errorMessage,
+                    'checked_at' => now()->toIso8601String(),
+                ],
+            ]);
+
+            if ($this->getOutput()->isVerbose()) {
+                $this->warn("⏳ {$project->name}: {$errorMessage} (confirming...)");
+            }
+
+            return 'confirming';
+        }
+
+        // Second consecutive failure — confirmed down
         $this->logCheck($project, 'error', null, null, $errorMessage);
 
         $project->update([
@@ -256,7 +309,7 @@ class CheckSiteUptime extends Command
             $this->error("💥 {$project->name}: {$errorMessage}");
         }
 
-        // Send site down notification
+        // Send site down notification (confirmed down)
         $this->sendSiteDownNotification($project, 'connection_error', $errorMessage);
 
         return 'error';
@@ -268,7 +321,33 @@ class CheckSiteUptime extends Command
     protected function handleException(Project $project, \Exception $e): string
     {
         $errorMessage = $this->parseConnectionError($e->getMessage());
-        
+
+        // Confirm-before-alert: only mark as down_error if already confirming
+        $isAlreadyFailing = in_array($project->health_status, ['confirming_down', 'down_error']);
+
+        if (!$isAlreadyFailing) {
+            // First failure — mark as confirming, do NOT notify
+            $this->logCheck($project, 'confirming', null, null, $errorMessage);
+
+            $project->update([
+                'last_health_check_at' => now(),
+                'health_status' => 'confirming_down',
+                'last_health_details' => [
+                    'error' => true,
+                    'error_type' => 'exception',
+                    'error_message' => $errorMessage,
+                    'checked_at' => now()->toIso8601String(),
+                ],
+            ]);
+
+            if ($this->getOutput()->isVerbose()) {
+                $this->warn("⏳ {$project->name}: {$errorMessage} (confirming...)");
+            }
+
+            return 'confirming';
+        }
+
+        // Second consecutive failure — confirmed down
         $this->logCheck($project, 'error', null, null, $errorMessage);
 
         $project->update([
@@ -290,6 +369,9 @@ class CheckSiteUptime extends Command
             'project' => $project->name,
             'error' => $e->getMessage(),
         ]);
+
+        // Send site down notification (confirmed down)
+        $this->sendSiteDownNotification($project, 'exception', $errorMessage);
 
         return 'error';
     }
