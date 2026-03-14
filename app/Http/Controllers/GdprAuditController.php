@@ -45,7 +45,18 @@ class GdprAuditController extends Controller
 
         $mode = $request->input('mode', 'quick');
         $scriptPath = base_path('scripts/gdpr-audit.js');
-        $nodePath = trim(shell_exec('which node') ?: 'node');
+
+        // Find node path safely (shell_exec may be disabled on shared hosting)
+        $nodePath = 'node';
+        try {
+            $which = new Process(['which', 'node']);
+            $which->run();
+            if ($which->isSuccessful()) {
+                $nodePath = trim($which->getOutput()) ?: 'node';
+            }
+        } catch (\Throwable $e) {
+            // Fallback to 'node' — it's usually in PATH
+        }
 
         // On Linux servers, wrap with xvfb-run to provide a virtual display.
         $isLinux = PHP_OS_FAMILY === 'Linux';
