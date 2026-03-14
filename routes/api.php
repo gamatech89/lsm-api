@@ -90,6 +90,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('projects.check-health');
         Route::get('/projects/{project}/uptime-stats', [V1\ProjectController::class, 'uptimeStats'])
             ->name('projects.uptime-stats');
+
+        // GDPR Audit
+        Route::post('/projects/{project}/gdpr-audit', [\App\Http\Controllers\GdprAuditController::class, 'runAudit'])
+            ->name('projects.gdpr-audit.run');
+        Route::get('/projects/{project}/gdpr-audit', [\App\Http\Controllers\GdprAuditController::class, 'getLatest'])
+            ->name('projects.gdpr-audit.latest');
+        Route::get('/projects/{project}/gdpr-audits', [\App\Http\Controllers\GdprAuditController::class, 'index'])
+            ->name('projects.gdpr-audit.index');
+        Route::get('/projects/{project}/gdpr-audit/{report}/pdf', [\App\Http\Controllers\GdprAuditController::class, 'downloadPdf'])
+            ->name('projects.gdpr-audit.pdf');
+        Route::post('/projects/{project}/gdpr-audit/{report}/save-report', [\App\Http\Controllers\GdprAuditController::class, 'saveToReports'])
+            ->name('projects.gdpr-audit.save-report');
         Route::get('/projects-filter-options', [V1\ProjectController::class, 'filterOptions'])
             ->name('projects.filter-options');
         Route::get('/projects-stats', [V1\ProjectController::class, 'stats'])
@@ -195,6 +207,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::apiResource('projects.todos', V1\TodoController::class)->shallow();
         Route::get('/todos/{todo}/download', [V1\TodoController::class, 'download'])
             ->name('todos.download');
+        Route::get('/todos/{todo}/preview', [V1\TodoController::class, 'preview'])
+            ->name('todos.preview');
 
         // -------------------------------------------------
         // RESOURCES (nested under projects)
