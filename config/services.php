@@ -40,4 +40,9 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
     ],
 
+    'gdpr_audit' => [
+        'url' => env('GDPR_AUDIT_SERVICE_URL'),
+        'key' => env('GDPR_AUDIT_SERVICE_KEY', 'lsm-gdpr-audit-2026-secure-key'),
+    ],
+
 ];

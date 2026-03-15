@@ -44,56 +44,28 @@ class GdprAuditController extends Controller
         set_time_limit(0);
 
         $mode = $request->input('mode', 'quick');
-        $scriptPath = base_path('scripts/gdpr-audit.js');
 
-        // Find node path safely (shell_exec may be disabled on shared hosting)
-        $nodePath = 'node';
-        try {
-            $which = new Process(['which', 'node']);
-            $which->run();
-            if ($which->isSuccessful()) {
-                $nodePath = trim($which->getOutput()) ?: 'node';
-            }
-        } catch (\Throwable $e) {
-            // Fallback to 'node' — it's usually in PATH
+        // ── Run the audit (remote microservice or local fallback) ──
+        $serviceUrl = config('services.gdpr_audit.url');
+        $serviceKey = config('services.gdpr_audit.key');
+
+        if ($serviceUrl) {
+            // Production: call remote microservice
+            $auditData = $this->runRemoteAudit($serviceUrl, $serviceKey, $project->url, $mode);
+        } else {
+            // Local dev: run Puppeteer directly
+            $auditData = $this->runLocalAudit($project->url, $mode);
         }
 
-        // On Linux servers, wrap with xvfb-run to provide a virtual display.
-        $isLinux = PHP_OS_FAMILY === 'Linux';
-        $command = $isLinux
-            ? ['xvfb-run', '--auto-servernum', '--server-args=-screen 0 1280x800x24', $nodePath, $scriptPath, $project->url, "--mode={$mode}"]
-            : [$nodePath, $scriptPath, $project->url, "--mode={$mode}"];
-
-        $process = new Process($command);
-        $process->setTimeout($mode === 'full' ? 180 : 120);
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            $errorOutput = $process->getErrorOutput() ?: $process->getOutput();
-            $decoded = json_decode($errorOutput, true);
-
+        if (!$auditData) {
             return response()->json([
                 'success' => false,
-                'message' => $decoded['error'] ?? 'GDPR audit script failed. Ensure Node.js and Chrome are installed.',
-                'raw_error' => $errorOutput,
+                'message' => 'GDPR audit failed. Check server logs for details.',
             ], 500);
         }
 
-        $output = $process->getOutput();
-        $result = json_decode($output, true);
-
-        if (!$result || !($result['success'] ?? false)) {
-            return response()->json([
-                'success' => false,
-                'message' => $result['error'] ?? 'Failed to parse audit results.',
-            ], 500);
-        }
-
-        $auditData = $result['data'];
         $screenshotPath = $auditData['screenshotPath'] ?? null;
         $aiEnhanced = false;
-        $aiSummary = null;
-        $aiBanner = null;
 
         // ── AI Enhancement Pipeline ──
 
@@ -106,7 +78,6 @@ class GdprAuditController extends Controller
                 Log::info('GDPR AI: Banner analysis succeeded', [
                     'url' => $project->url,
                     'bannerFound' => $aiBanner['bannerFound'] ?? false,
-                    'solution' => $aiBanner['solution'] ?? null,
                 ]);
             }
         }
@@ -119,7 +90,6 @@ class GdprAuditController extends Controller
             Log::info('GDPR AI: Summary generated', [
                 'url' => $project->url,
                 'score' => $aiSummary['score'] ?? null,
-                'verdict' => $aiSummary['verdict'] ?? null,
             ]);
         }
 
@@ -127,11 +97,8 @@ class GdprAuditController extends Controller
         if ($screenshotPath && file_exists($screenshotPath)) {
             @unlink($screenshotPath);
         }
-
-        // Remove screenshotPath from stored data (it's a temp file path)
         unset($auditData['screenshotPath']);
 
-        // Mark as AI-enhanced
         $auditData['aiEnhanced'] = $aiEnhanced;
 
         // Save the audit report
@@ -144,6 +111,82 @@ class GdprAuditController extends Controller
             'success' => true,
             'data' => $report,
         ]);
+    }
+
+    /**
+     * Call the remote GDPR audit microservice.
+     */
+    private function runRemoteAudit(string $serviceUrl, string $serviceKey, string $url, string $mode): ?array
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout($mode === 'full' ? 180 : 120)
+                ->withHeaders(['X-Api-Key' => $serviceKey])
+                ->post(rtrim($serviceUrl, '/') . '/audit', [
+                    'url' => $url,
+                    'mode' => $mode,
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('GDPR remote audit failed', ['status' => $response->status(), 'body' => $response->body()]);
+                return null;
+            }
+
+            $result = $response->json();
+            if (!$result || !($result['success'] ?? false)) {
+                Log::error('GDPR remote audit returned error', ['result' => $result]);
+                return null;
+            }
+
+            $auditData = $result['data'];
+
+            // If microservice returned a base64 screenshot, save to temp file for AI
+            if (!empty($auditData['screenshotBase64'])) {
+                $tmpPath = sys_get_temp_dir() . '/gdpr-screenshot-' . time() . '.png';
+                file_put_contents($tmpPath, base64_decode($auditData['screenshotBase64']));
+                $auditData['screenshotPath'] = $tmpPath;
+                unset($auditData['screenshotBase64']);
+            }
+
+            return $auditData;
+        } catch (\Throwable $e) {
+            Log::error('GDPR remote audit exception', ['message' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Run audit locally via Puppeteer process (dev environment).
+     */
+    private function runLocalAudit(string $url, string $mode): ?array
+    {
+        $scriptPath = base_path('scripts/gdpr-audit.js');
+        $nodePath = 'node';
+        try {
+            $which = new Process(['which', 'node']);
+            $which->run();
+            if ($which->isSuccessful()) {
+                $nodePath = trim($which->getOutput()) ?: 'node';
+            }
+        } catch (\Throwable $e) {
+            // fallback
+        }
+
+        $isLinux = PHP_OS_FAMILY === 'Linux';
+        $command = $isLinux
+            ? ['xvfb-run', '--auto-servernum', '--server-args=-screen 0 1280x800x24', $nodePath, $scriptPath, $url, "--mode={$mode}"]
+            : [$nodePath, $scriptPath, $url, "--mode={$mode}"];
+
+        $process = new Process($command);
+        $process->setTimeout($mode === 'full' ? 180 : 120);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            Log::error('GDPR local audit failed', ['error' => $process->getErrorOutput()]);
+            return null;
+        }
+
+        $result = json_decode($process->getOutput(), true);
+        return ($result && ($result['success'] ?? false)) ? $result['data'] : null;
     }
 
     /**
