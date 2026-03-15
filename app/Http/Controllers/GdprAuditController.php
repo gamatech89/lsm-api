@@ -32,6 +32,7 @@ class GdprAuditController extends Controller
     {
         $request->validate([
             'mode' => 'in:quick,full',
+            'locale' => 'in:en,de',
         ]);
 
         if (!$project->url) {
@@ -44,6 +45,7 @@ class GdprAuditController extends Controller
         set_time_limit(0);
 
         $mode = $request->input('mode', 'quick');
+        $locale = $request->input('locale', 'en');
 
         // ── Run the audit (remote microservice or local fallback) ──
         $serviceUrl = config('services.gdpr_audit.url');
@@ -82,8 +84,8 @@ class GdprAuditController extends Controller
             }
         }
 
-        // Step 2: AI compliance summary
-        $aiSummary = $this->aiService->generateSummary($auditData, $project->url);
+        // Step 2: AI compliance summary (locale-aware)
+        $aiSummary = $this->aiService->generateSummary($auditData, $project->url, $locale);
         if ($aiSummary) {
             $aiEnhanced = true;
             $auditData['aiSummary'] = $aiSummary;

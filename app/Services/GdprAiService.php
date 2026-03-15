@@ -85,7 +85,7 @@ class GdprAiService
      * Generate an AI-powered GDPR compliance summary from raw audit data.
      * Returns structured JSON or null on failure.
      */
-    public function generateSummary(array $auditData, string $url): ?array
+    public function generateSummary(array $auditData, string $url, string $locale = 'en'): ?array
     {
         if (!$this->apiKey) {
             return null;
@@ -104,7 +104,7 @@ class GdprAiService
                     'messages' => [
                         [
                             'role' => 'user',
-                            'content' => $this->getSummaryPrompt($auditData, $url),
+                            'content' => $this->getSummaryPrompt($auditData, $url, $locale),
                         ],
                     ],
                 ]);
@@ -164,9 +164,13 @@ PROMPT;
     /**
      * Prompt for generating the GDPR compliance summary.
      */
-    protected function getSummaryPrompt(array $auditData, string $url): string
+    protected function getSummaryPrompt(array $auditData, string $url, string $locale = 'en'): string
     {
         $dataJson = json_encode($auditData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        $languageInstruction = $locale === 'de'
+            ? "\nRESPONSE LANGUAGE: Write ALL text fields (summary, violation titles/descriptions/recommendations, positives, recommendation actions) in German. Keep only technical terms, service names, and legal references in their original language."
+            : '';
 
         return <<<PROMPT
 You are a GDPR/TDDDG compliance auditor for German websites. Analyze the following raw audit data from a Puppeteer-based scan of {$url}.
@@ -227,6 +231,7 @@ IMPORTANT:
 - Reference German law (TDDDG §25, GDPR Art. 5, 6, 7) where applicable
 - Distinguish between cookie banner consent and content blockers (e.g. Borlabs Content Blocker for videos)
 - Be concise but actionable in recommendations
+{$languageInstruction}
 PROMPT;
     }
 
