@@ -102,6 +102,19 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('projects.gdpr-audit.pdf');
         Route::post('/projects/{project}/gdpr-audit/{report}/save-report', [\App\Http\Controllers\GdprAuditController::class, 'saveToReports'])
             ->name('projects.gdpr-audit.save-report');
+
+        // Accessibility Audit
+        Route::post('/projects/{project}/accessibility-audit', [\App\Http\Controllers\AccessibilityAuditController::class, 'runAudit'])
+            ->name('projects.accessibility-audit.run');
+        Route::get('/projects/{project}/accessibility-audit', [\App\Http\Controllers\AccessibilityAuditController::class, 'getLatest'])
+            ->name('projects.accessibility-audit.latest');
+        Route::get('/projects/{project}/accessibility-audits', [\App\Http\Controllers\AccessibilityAuditController::class, 'index'])
+            ->name('projects.accessibility-audit.index');
+        Route::get('/projects/{project}/accessibility-audit/{report}/pdf', [\App\Http\Controllers\AccessibilityAuditController::class, 'downloadPdf'])
+            ->name('projects.accessibility-audit.pdf');
+        Route::post('/projects/{project}/accessibility-audit/{report}/save-report', [\App\Http\Controllers\AccessibilityAuditController::class, 'saveToReports'])
+            ->name('projects.accessibility-audit.save-report');
+
         Route::get('/projects-filter-options', [V1\ProjectController::class, 'filterOptions'])
             ->name('projects.filter-options');
         Route::get('/projects-stats', [V1\ProjectController::class, 'stats'])

@@ -152,3 +152,19 @@ Schedule::command('security:scan --notify')
     ->name('security-scan-weekly')
     ->onOneServer();
 
+/*
+|--------------------------------------------------------------------------
+| Todo Due Date Reminders
+|--------------------------------------------------------------------------
+|
+| Sends reminder notifications to assigned users when their todos are
+| due within the next 24 hours. Runs hourly with dedup logic.
+|
+*/
+
+Schedule::command('todos:send-due-reminders')
+    ->hourly()
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping()
+    ->name('todo-due-reminders')
+    ->onOneServer();

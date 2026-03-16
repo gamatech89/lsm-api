@@ -119,7 +119,7 @@ class TodoController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'required|in:low,medium,high,critical',
-            'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
+            'status' => 'sometimes|in:pending,in_progress,in_review,completed,cancelled',
             'due_date' => 'nullable|date',
             'assignee_id' => 'nullable|exists:users,id',
             'file' => 'nullable|file|max:10240', // 10MB max
@@ -177,7 +177,7 @@ class TodoController extends Controller
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'sometimes|in:low,medium,high,critical',
-            'status' => 'sometimes|in:pending,in_progress,completed,cancelled',
+            'status' => 'sometimes|in:pending,in_progress,in_review,completed,cancelled',
             'completed' => 'sometimes|boolean',
             'due_date' => 'nullable|date',
             'assignee_id' => 'nullable|exists:users,id',
@@ -263,5 +263,28 @@ class TodoController extends Controller
             Storage::disk('local')->path($todo->file_path),
             $todo->file_name ?? 'download'
         );
+    }
+
+    /**
+     * Preview the attached file inline (for images).
+     *
+     * @param Todo $todo
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
+     */
+    public function preview(Todo $todo)
+    {
+        Gate::authorize('view', $todo->project);
+
+        if (!$todo->file_path || !Storage::disk('local')->exists($todo->file_path)) {
+            return $this->notFoundResponse('File not found');
+        }
+
+        $path = Storage::disk('local')->path($todo->file_path);
+        $mimeType = mime_content_type($path) ?: 'application/octet-stream';
+
+        return response()->file($path, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . ($todo->file_name ?? 'preview') . '"',
+        ]);
     }
 }
