@@ -6,6 +6,7 @@ use App\Models\GdprAuditReport;
 use App\Models\MaintenanceReport;
 use App\Models\Project;
 use App\Services\GdprAiService;
+use App\Services\PdfService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,8 +16,10 @@ use Symfony\Component\Process\Process;
 
 class GdprAuditController extends Controller
 {
-    public function __construct(private GdprAiService $aiService)
-    {
+    public function __construct(
+        private GdprAiService $aiService,
+        private PdfService $pdfService,
+    ) {
     }
 
     /**
@@ -231,7 +234,7 @@ class GdprAuditController extends Controller
         $aiSummary = $auditData['aiSummary'] ?? [];
         $score = $aiSummary['score'] ?? $auditData['score'] ?? 0;
 
-        $pdf = Pdf::loadView('pdf.gdpr-audit', [
+        $templateData = [
             'projectName' => $project->name,
             'url' => $auditData['url'] ?? $project->url,
             'auditData' => $auditData,
@@ -240,7 +243,7 @@ class GdprAuditController extends Controller
             'verdict' => $aiSummary['verdict'] ?? ($score >= 80 ? 'Good' : ($score >= 50 ? 'Needs Improvement' : 'Critical Issues')),
             'auditMode' => $auditData['mode'] ?? 'quick',
             'generatedAt' => now()->format('F j, Y \a\t g:i A'),
-        ]);
+        ];
 
         $filename = sprintf(
             'gdpr-audit-%s-%s.pdf',
@@ -248,6 +251,18 @@ class GdprAuditController extends Controller
             $report->created_at->format('Y-m-d')
         );
 
+        // Try Puppeteer PDF service first
+        $pdfBinary = $this->pdfService->generate('gdpr-audit', $templateData);
+
+        if ($pdfBinary) {
+            return response($pdfBinary)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+        }
+
+        // Fallback to DomPDF
+        Log::warning('PdfService unavailable for GDPR audit, falling back to DomPDF');
+        $pdf = Pdf::loadView('pdf.gdpr-audit', $templateData);
         return $pdf->download($filename);
     }
 
@@ -260,7 +275,7 @@ class GdprAuditController extends Controller
         $aiSummary = $auditData['aiSummary'] ?? [];
         $score = $aiSummary['score'] ?? $auditData['score'] ?? 0;
 
-        $pdf = Pdf::loadView('pdf.gdpr-audit', [
+        $templateData = [
             'projectName' => $project->name,
             'url' => $auditData['url'] ?? $project->url,
             'auditData' => $auditData,
@@ -269,7 +284,17 @@ class GdprAuditController extends Controller
             'verdict' => $aiSummary['verdict'] ?? ($score >= 80 ? 'Good' : ($score >= 50 ? 'Needs Improvement' : 'Critical Issues')),
             'auditMode' => $auditData['mode'] ?? 'quick',
             'generatedAt' => now()->format('F j, Y \a\t g:i A'),
-        ]);
+        ];
+
+        // Try Puppeteer PDF service first
+        $pdfContent = $this->pdfService->generate('gdpr-audit', $templateData);
+
+        if (!$pdfContent) {
+            // Fallback to DomPDF
+            Log::warning('PdfService unavailable for GDPR saveToReports, falling back to DomPDF');
+            $pdf = Pdf::loadView('pdf.gdpr-audit', $templateData);
+            $pdfContent = $pdf->output();
+        }
 
         // Save PDF to storage
         $filename = sprintf(
@@ -278,7 +303,7 @@ class GdprAuditController extends Controller
             $report->created_at->format('Y-m-d-His')
         );
         $path = "maintenance-reports/{$project->id}/{$filename}";
-        Storage::disk('local')->put($path, $pdf->output());
+        Storage::disk('local')->put($path, $pdfContent);
 
         // Create a maintenance report entry
         $maintenanceReport = MaintenanceReport::create([

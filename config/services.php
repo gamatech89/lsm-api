@@ -50,4 +50,9 @@ return [
         'key' => env('ACCESSIBILITY_AUDIT_SERVICE_KEY', 'lsm-gdpr-audit-2026-secure-key'),
     ],
 
+    'pdf_service' => [
+        'url' => env('PDF_SERVICE_URL'),
+        'key' => env('PDF_SERVICE_KEY', 'lsm-gdpr-audit-2026-secure-key'),
+    ],
+
 ];
