@@ -167,8 +167,14 @@ class GdprAuditController extends Controller
                 unset($auditData['screenshotBase64']);
             }
 
-            // AI enhancement
-            $auditData = $this->enhanceWithAi($auditData, $project->url, $locale);
+            // Try AI enhancement but don't let it block — timeout after 20s
+            set_time_limit(60);
+            try {
+                $auditData = $this->enhanceWithAi($auditData, $project->url, $locale);
+            } catch (\Throwable $e) {
+                Log::warning('GDPR AI enhancement failed, saving without AI', ['error' => $e->getMessage()]);
+                $auditData['aiEnhanced'] = false;
+            }
 
             // Save the report
             $report = GdprAuditReport::create([
