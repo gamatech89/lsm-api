@@ -18,31 +18,42 @@
         /* ── Header ───────────────────────────────────────── */
         .header {
             text-align: center;
-            padding-bottom: 20px;
-            margin-bottom: 24px;
-            border-bottom: 3px solid #4f46e5;
+            padding-bottom: 24px;
+            margin-bottom: 28px;
+            border-bottom: 2px solid #e8ebf0;
         }
         .header h1 {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 800;
             color: #1a1d27;
             letter-spacing: -0.5px;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
         }
         .header .subtitle {
-            font-size: 13px;
+            font-size: 14px;
             color: #8890a4;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
-        .header .url {
-            font-size: 11px;
-            color: #4f46e5;
-            text-decoration: none;
+
+        /* Status Badge */
+        .status-badge-wrap { text-align: center; margin-bottom: 18px; }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 24px;
+            border-radius: 24px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
+        .status-pass { background: #f0fdf4; color: #16a34a; border: 2px solid #bbf7d0; }
+        .status-warning { background: #fffbeb; color: #d97706; border: 2px solid #fde68a; }
+        .status-critical { background: #fef2f2; color: #dc2626; border: 2px solid #fecaca; }
+
         .meta-row {
             display: table;
             width: 100%;
-            margin-top: 14px;
+            margin-top: 16px;
         }
         .meta-item {
             display: table-cell;
@@ -56,22 +67,22 @@
             color: #8890a4;
             font-weight: 600;
             display: block;
-            margin-top: 2px;
+            margin-top: 3px;
         }
         .meta-value {
             font-size: 12px;
             font-weight: 600;
-            color: #1a1d27;
+            color: #4a5068;
         }
 
         /* ── Score Section ────────────────────────────────── */
         .score-section {
             text-align: center;
-            margin: 20px 0 24px;
-            padding: 20px;
+            margin: 0 0 28px;
+            padding: 24px;
             background: #f8f9fb;
-            border: 1px solid #dfe2e8;
-            border-radius: 8px;
+            border: 1px solid #e8ebf0;
+            border-radius: 10px;
         }
         .score-row {
             display: table;
@@ -79,33 +90,33 @@
         }
         .score-main {
             display: table-cell;
-            width: 30%;
+            width: 35%;
             text-align: center;
             vertical-align: middle;
         }
-        .score-circle {
+        .score-wheel {
+            position: relative;
             display: inline-block;
-            width: 80px;
-            height: 80px;
-            line-height: 80px;
-            border-radius: 50%;
-            font-size: 28px;
-            font-weight: 800;
-            color: white;
-            text-align: center;
+            width: 120px;
+            height: 120px;
         }
-        .score-good { background: #16a34a; }
-        .score-warning { background: #d97706; }
-        .score-bad { background: #dc2626; }
+        .score-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: 800;
+        }
         .score-label {
             display: block;
-            font-size: 10px;
+            font-size: 11px;
             color: #8890a4;
-            margin-top: 6px;
+            margin-top: 8px;
         }
         .score-stats {
             display: table-cell;
-            width: 70%;
+            width: 65%;
             vertical-align: middle;
         }
         .stats-grid {
@@ -115,73 +126,75 @@
         .stat-box {
             display: table-cell;
             text-align: center;
-            padding: 8px 6px;
+            padding: 8px 4px;
             vertical-align: top;
         }
         .stat-value {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
             display: block;
         }
-        .stat-value-good { color: #16a34a; }
-        .stat-value-bad { color: #dc2626; }
-        .stat-value-neutral { color: #1a1d27; }
         .stat-label {
             font-size: 9px;
             color: #8890a4;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             display: block;
-            margin-top: 2px;
+            margin-top: 3px;
         }
+        .color-good { color: #16a34a; }
+        .color-bad { color: #dc2626; }
+        .color-warn { color: #d97706; }
+        .color-neutral { color: #1a1d27; }
 
-        /* ── Status Badge ─────────────────────────────────── */
-        .status-badge {
-            display: inline-block;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-top: 8px;
+        /* ── Verification Box ─────────────────────────────── */
+        .verify-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
         }
-        .status-pass { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-        .status-warning { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
-        .status-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .verify-box strong {
+            color: #2563eb;
+            font-size: 12px;
+        }
+        .verify-box p {
+            font-size: 11px;
+            color: #4a5068;
+            margin-top: 4px;
+            line-height: 1.5;
+        }
 
         /* ── Section ──────────────────────────────────────── */
         .section {
-            margin-bottom: 18px;
+            margin-bottom: 20px;
             page-break-inside: avoid;
         }
         .section-header {
-            display: table;
-            width: 100%;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             padding-bottom: 6px;
-            border-bottom: 2px solid #dfe2e8;
-        }
-        .section-icon {
-            display: table-cell;
-            width: 20px;
-            vertical-align: middle;
-            font-size: 14px;
+            border-bottom: 2px solid #e8ebf0;
         }
         .section-title {
-            display: table-cell;
-            vertical-align: middle;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             color: #1a1d27;
             letter-spacing: -0.3px;
         }
+        .section-count {
+            font-size: 12px;
+            font-weight: 400;
+            color: #8890a4;
+        }
 
         /* ── Verdict Bar ──────────────────────────────────── */
         .verdict {
-            padding: 10px 14px;
-            border-radius: 6px;
+            padding: 12px 16px;
+            border-radius: 8px;
             font-size: 12px;
             font-weight: 500;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             line-height: 1.6;
         }
         .verdict-pass { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
@@ -191,10 +204,13 @@
         /* ── Tables ───────────────────────────────────────── */
         .audit-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-size: 10px;
             margin-bottom: 8px;
-            border: 1px solid #dfe2e8;
+            border: 1px solid #e8ebf0;
+            border-radius: 8px;
+            overflow: hidden;
         }
         .audit-table th {
             text-align: left;
@@ -203,19 +219,21 @@
             color: #8890a4;
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            padding: 8px 12px;
+            padding: 10px 14px;
             background: #f8f9fb;
-            border-bottom: 2px solid #dfe2e8;
+            border-bottom: 2px solid #e8ebf0;
         }
         .audit-table td {
-            padding: 7px 12px;
+            padding: 8px 14px;
             border-bottom: 1px solid #f1f3f6;
             vertical-align: top;
             color: #4a5068;
         }
         .audit-table tr:last-child td { border-bottom: none; }
-        .audit-table td:first-child { font-weight: 500; color: #1a1d27; }
-        .status-cell { text-align: center; font-size: 14px; width: 40px; }
+        .status-cell { text-align: center; width: 40px; font-weight: 700; font-size: 12px; }
+        .status-pass { color: #16a34a; }
+        .status-fail { color: #dc2626; }
+        .status-warn { color: #d97706; }
 
         /* ── Tags ─────────────────────────────────────────── */
         .tag {
@@ -229,7 +247,7 @@
         .tag-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
         .tag-high { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .tag-medium { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
-        .tag-low { background: #f8f9fb; color: #8890a4; border: 1px solid #dfe2e8; }
+        .tag-low { background: #f8f9fb; color: #8890a4; border: 1px solid #e8ebf0; }
         .tag-pass { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
 
         /* ── Critical Issues Box ──────────────────────────── */
@@ -237,24 +255,25 @@
             background: #fef2f2;
             border: 1px solid #fecaca;
             border-radius: 8px;
-            padding: 16px 20px;
-            margin-bottom: 18px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
             page-break-inside: avoid;
         }
         .critical-box h3 {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
             color: #dc2626;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .critical-item {
             padding: 4px 0 4px 16px;
             position: relative;
             font-size: 11px;
             color: #1a1d27;
+            line-height: 1.5;
         }
         .critical-item::before {
-            content: "•";
+            content: "\2022";
             color: #dc2626;
             position: absolute;
             left: 4px;
@@ -264,38 +283,38 @@
         /* ── Recommendations ──────────────────────────────── */
         .rec-box {
             background: #f8f9fb;
-            border: 1px solid #dfe2e8;
+            border: 1px solid #e8ebf0;
             border-radius: 8px;
-            padding: 16px 20px;
-            margin-bottom: 18px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
             page-break-inside: avoid;
         }
         .rec-box h3 {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
             color: #1a1d27;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
         .rec-item {
             display: table;
             width: 100%;
-            padding: 6px 0;
-            border-bottom: 1px solid #dfe2e8;
+            padding: 7px 0;
+            border-bottom: 1px solid #e8ebf0;
         }
         .rec-item:last-child { border-bottom: none; }
         .rec-number {
             display: table-cell;
-            width: 24px;
+            width: 28px;
             text-align: center;
             vertical-align: top;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
             color: #4f46e5;
             padding-top: 2px;
         }
         .rec-priority {
             display: table-cell;
-            width: 60px;
+            width: 65px;
             vertical-align: top;
             padding-top: 2px;
         }
@@ -312,17 +331,18 @@
             background: #f0fdf4;
             border: 1px solid #bbf7d0;
             border-radius: 8px;
-            padding: 14px 18px;
-            margin-bottom: 18px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
         }
         .positive-item {
             padding: 3px 0 3px 16px;
             position: relative;
             font-size: 11px;
             color: #15803d;
+            line-height: 1.5;
         }
         .positive-item::before {
-            content: "✓";
+            content: "\2713";
             position: absolute;
             left: 0;
             color: #16a34a;
@@ -332,10 +352,10 @@
         /* ── Cookie Evidence ──────────────────────────────── */
         .cookie-list {
             background: #f8f9fb;
-            border: 1px solid #dfe2e8;
+            border: 1px solid #e8ebf0;
             border-radius: 6px;
-            padding: 10px 14px;
-            margin: 6px 0;
+            padding: 12px 16px;
+            margin: 8px 0;
             font-size: 10px;
             color: #4a5068;
             line-height: 1.8;
@@ -343,60 +363,48 @@
         .cookie-name { color: #dc2626; font-weight: 600; }
         .cookie-service { color: #8890a4; }
 
-        /* ── Small badge ──────────────────────────────────── */
+        /* ── Small badges ─────────────────────────────────── */
         .ai-badge {
             display: inline-block;
             background: #4f46e5;
             color: white;
-            padding: 2px 10px;
+            padding: 3px 12px;
             border-radius: 12px;
-            font-size: 9px;
+            font-size: 10px;
             font-weight: 700;
         }
         .mode-badge {
             display: inline-block;
             background: #f8f9fb;
             color: #4a5068;
-            padding: 2px 10px;
+            padding: 3px 12px;
             border-radius: 12px;
-            font-size: 9px;
+            font-size: 10px;
             font-weight: 600;
-            border: 1px solid #dfe2e8;
+            border: 1px solid #e8ebf0;
         }
 
-        /* ── Two Column ───────────────────────────────────── */
-        .two-col {
-            display: table;
-            width: 100%;
+        .legal-ref {
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-size: 9px;
+            background: #f1f3f6;
+            padding: 1px 5px;
+            border-radius: 3px;
+            color: #4a5068;
         }
-        .col {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
-            padding-right: 8px;
-        }
-        .col:last-child { padding-right: 0; padding-left: 8px; }
 
         /* ── Footer ───────────────────────────────────────── */
         .footer {
-            margin-top: 28px;
-            padding-top: 14px;
-            border-top: 2px solid #dfe2e8;
+            margin-top: 30px;
+            padding-top: 16px;
+            border-top: 2px solid #e8ebf0;
             text-align: center;
-            font-size: 9px;
+            font-size: 10px;
             color: #8890a4;
         }
         .footer strong { color: #4f46e5; }
 
         .page-break { page-break-before: always; }
-        .legal-ref {
-            font-family: 'DejaVu Sans Mono', monospace;
-            font-size: 9px;
-            background: #f1f3f6;
-            padding: 1px 4px;
-            border-radius: 3px;
-            color: #4a5068;
-        }
     </style>
 </head>
 
@@ -404,18 +412,24 @@
     {{-- ══ HEADER ══════════════════════════════════════════ --}}
     <div class="header">
         <h1>GDPR Compliance Report</h1>
-        <div class="subtitle">{{ $projectName }} — German Market Audit</div>
-        @if($url)
-            <a href="{{ $url }}" class="url">{{ $url }}</a>
-        @endif
-        <div class="meta-row" style="margin-top: 14px;">
+        <div class="subtitle">{{ $projectName }} &mdash; German Market</div>
+
+        <div class="status-badge-wrap">
+            <span class="status-badge {{ $score >= 80 ? 'status-pass' : ($score >= 50 ? 'status-warning' : 'status-critical') }}">
+                @if($score >= 80)
+                    COMPLIANT
+                @elseif($score >= 50)
+                    ISSUES FOUND &mdash; ACTION REQUIRED
+                @else
+                    CRITICAL VIOLATIONS
+                @endif
+            </span>
+        </div>
+
+        <div class="meta-row">
             <div class="meta-item">
                 <span class="meta-value">{{ $generatedAt }}</span>
-                <span class="meta-label">Audit Date</span>
-            </div>
-            <div class="meta-item">
-                <span class="meta-value">{{ ucfirst($auditMode) }} Scan</span>
-                <span class="meta-label">Mode</span>
+                <span class="meta-label">Date</span>
             </div>
             <div class="meta-item">
                 @if(!empty($auditData['cookieBanner']['solution']))
@@ -423,81 +437,92 @@
                 @elseif(!empty($auditData['summary']['cookieBannerSolution']))
                     <span class="meta-value">{{ implode(', ', $auditData['summary']['cookieBannerSolution']) }}</span>
                 @else
-                    <span class="meta-value">—</span>
+                    <span class="meta-value">&mdash;</span>
                 @endif
                 <span class="meta-label">Consent Tool</span>
             </div>
             <div class="meta-item">
-                @if($auditData['aiEnhanced'] ?? false)
-                    <span class="ai-badge">AI-Enhanced</span>
-                @else
-                    <span class="mode-badge">Basic Scan</span>
-                @endif
-                <span class="meta-label">Analysis</span>
+                <span class="meta-value">{{ ucfirst($auditMode) }} Scan</span>
+                <span class="meta-label">Mode</span>
             </div>
         </div>
     </div>
 
     {{-- ══ SCORE SECTION ══════════════════════════════════ --}}
+    @php
+        $circumference = 326.7;
+        $dashoffset = $circumference - ($circumference * $score / 100);
+        $scoreColor = $score >= 80 ? '#16a34a' : ($score >= 50 ? '#d97706' : '#dc2626');
+    @endphp
     <div class="score-section">
         <div class="score-row">
             <div class="score-main">
-                <div class="score-circle {{ $score >= 80 ? 'score-good' : ($score >= 50 ? 'score-warning' : 'score-bad') }}">
-                    {{ $score }}
+                <div class="score-wheel">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="#e8ebf0" stroke-width="8"/>
+                        <circle cx="60" cy="60" r="52" fill="none"
+                            stroke="{{ $scoreColor }}"
+                            stroke-width="8"
+                            stroke-linecap="round"
+                            stroke-dasharray="{{ $circumference }}"
+                            stroke-dashoffset="{{ $dashoffset }}"
+                            transform="rotate(-90 60 60)"/>
+                    </svg>
+                    <div class="score-number" style="color: {{ $scoreColor }};">{{ $score }}</div>
                 </div>
-                <span class="score-label">Compliance Score</span>
-                <div style="margin-top: 8px;">
-                    <span class="status-badge {{ $score >= 80 ? 'status-pass' : ($score >= 50 ? 'status-warning' : 'status-critical') }}">
-                        {{ $verdict }}
-                    </span>
-                </div>
+                <span class="score-label">Compliance Score (of 100)</span>
             </div>
             <div class="score-stats">
                 <div class="stats-grid">
                     <div class="stat-box">
-                        <span class="stat-value {{ ($auditData['summary']['trackingRequests'] ?? 0) > 0 ? 'stat-value-bad' : 'stat-value-good' }}">
+                        <span class="stat-value {{ ($auditData['summary']['trackingRequests'] ?? 0) > 0 ? 'color-bad' : 'color-good' }}">
                             {{ $auditData['summary']['trackingRequests'] ?? 0 }}
                         </span>
                         <span class="stat-label">Trackers</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-value {{ ($auditData['summary']['trackingCookies'] ?? 0) > 0 ? 'stat-value-bad' : 'stat-value-good' }}">
+                        <span class="stat-value {{ ($auditData['summary']['trackingCookies'] ?? 0) > 0 ? 'color-bad' : 'color-good' }}">
                             {{ $auditData['summary']['trackingCookies'] ?? 0 }}
                         </span>
-                        <span class="stat-label">Tracking Cookies</span>
+                        <span class="stat-label">Cookies</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-value {{ ($auditData['summary']['cookieBannerDetected'] ?? false) ? 'stat-value-good' : 'stat-value-bad' }}">
-                            {{ ($auditData['summary']['cookieBannerDetected'] ?? false) ? '✓' : '✗' }}
+                        <span class="stat-value {{ ($auditData['summary']['cookieBannerDetected'] ?? false) ? 'color-good' : 'color-bad' }}">
+                            {{ ($auditData['summary']['cookieBannerDetected'] ?? false) ? 'Yes' : 'No' }}
                         </span>
-                        <span class="stat-label">Cookie Banner</span>
+                        <span class="stat-label">Banner</span>
                     </div>
                     @if(($auditData['summary']['acceptFlowWorks'] ?? null) !== null)
                     <div class="stat-box">
-                        <span class="stat-value {{ ($auditData['summary']['acceptFlowWorks'] ?? false) ? 'stat-value-good' : 'stat-value-bad' }}">
-                            {{ ($auditData['summary']['acceptFlowWorks'] ?? false) ? '✓' : '✗' }}
+                        <span class="stat-value {{ ($auditData['summary']['acceptFlowWorks'] ?? false) ? 'color-good' : 'color-bad' }}">
+                            {{ ($auditData['summary']['acceptFlowWorks'] ?? false) ? 'Yes' : 'No' }}
                         </span>
-                        <span class="stat-label">Accept Flow</span>
+                        <span class="stat-label">Accept</span>
                     </div>
                     @endif
                     @if(($auditData['summary']['rejectFlowClean'] ?? null) !== null)
                     <div class="stat-box">
-                        <span class="stat-value {{ ($auditData['summary']['rejectFlowClean'] ?? false) ? 'stat-value-good' : 'stat-value-bad' }}">
-                            {{ ($auditData['summary']['rejectFlowClean'] ?? false) ? '✓' : '✗' }}
+                        <span class="stat-value {{ ($auditData['summary']['rejectFlowClean'] ?? false) ? 'color-good' : 'color-bad' }}">
+                            {{ ($auditData['summary']['rejectFlowClean'] ?? false) ? 'Yes' : 'No' }}
                         </span>
-                        <span class="stat-label">Reject Flow</span>
+                        <span class="stat-label">Reject</span>
                     </div>
                     @endif
                 </div>
             </div>
         </div>
+    </div>
+
+    {{-- ══ VERIFICATION BOX ══════════════════════════════ --}}
+    <div class="verify-box">
+        <strong>Verification Method</strong>
+        <p>This audit was performed using Puppeteer with fresh browser contexts (equivalent to incognito mode) for each scenario, ensuring zero session contamination and reproducible results.</p>
     </div>
 
     {{-- ══ AI SUMMARY ════════════════════════════════════ --}}
     @if(!empty($aiSummary['summary']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">🤖</span>
             <span class="section-title">AI Compliance Analysis</span>
         </div>
         <div class="verdict {{ $score >= 80 ? 'verdict-pass' : ($score >= 50 ? 'verdict-warning' : 'verdict-fail') }}">
@@ -509,7 +534,7 @@
     {{-- ══ CRITICAL ISSUES ════════════════════════════════ --}}
     @if(!empty($auditData['issues']))
     <div class="critical-box">
-        <h3>⚠ Critical Issues ({{ count($auditData['issues']) }})</h3>
+        <h3>Critical Issues ({{ count($auditData['issues']) }})</h3>
         @foreach($auditData['issues'] as $issue)
             <div class="critical-item">{{ $issue }}</div>
         @endforeach
@@ -520,17 +545,16 @@
     @if(!empty($aiSummary['violations']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">❌</span>
-            <span class="section-title">Violations ({{ count($aiSummary['violations']) }})</span>
+            <span class="section-title">Violations <span class="section-count">({{ count($aiSummary['violations']) }})</span></span>
         </div>
         <table class="audit-table">
             <thead>
                 <tr>
                     <th style="width: 60px;">Severity</th>
-                    <th style="width: 140px;">Issue</th>
+                    <th style="width: 130px;">Issue</th>
                     <th>Details</th>
                     <th style="width: 100px;">Legal Ref</th>
-                    <th style="width: 150px;">Recommendation</th>
+                    <th style="width: 140px;">Recommendation</th>
                 </tr>
             </thead>
             <tbody>
@@ -552,7 +576,6 @@
     @if(!empty($aiSummary['positives']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">✅</span>
             <span class="section-title">What's Done Right</span>
         </div>
         <div class="positive-box">
@@ -567,13 +590,12 @@
     @if(!empty($aiSummary['recommendations']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">💡</span>
-            <span class="section-title">Recommendations (by Priority)</span>
+            <span class="section-title">Recommendations <span class="section-count">(by Priority)</span></span>
         </div>
         <div class="rec-box">
             @foreach($aiSummary['recommendations'] as $i => $r)
                 <div class="rec-item">
-                    <div class="rec-number">{{ $i + 1 }}</div>
+                    <div class="rec-number">{{ $i + 1 }}.</div>
                     <div class="rec-priority">
                         <span class="tag tag-{{ ($r['priority'] ?? '') === 'high' ? 'critical' : (($r['priority'] ?? '') === 'medium' ? 'medium' : 'low') }}">
                             {{ $r['priority'] ?? 'low' }}
@@ -586,11 +608,12 @@
     </div>
     @endif
 
+    <div class="page-break"></div>
+
     {{-- ══ AUDIT CHECKS ═══════════════════════════════════ --}}
     @if(!empty($auditData['checks']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">🔍</span>
             <span class="section-title">Audit Checks</span>
         </div>
         <table class="audit-table">
@@ -604,13 +627,13 @@
             <tbody>
                 @foreach($auditData['checks'] as $check)
                 <tr>
-                    <td class="status-cell">
+                    <td class="status-cell {{ ($check['status'] ?? '') === 'pass' ? 'status-pass' : (($check['status'] ?? '') === 'warning' ? 'status-warn' : 'status-fail') }}">
                         @if(($check['status'] ?? '') === 'pass')
-                            ✅
+                            PASS
                         @elseif(($check['status'] ?? '') === 'warning')
-                            ⚠️
+                            WARN
                         @else
-                            ❌
+                            FAIL
                         @endif
                     </td>
                     <td style="font-weight: 600; color: #1a1d27;">{{ $check['name'] ?? '' }}</td>
@@ -626,24 +649,23 @@
     @if(!empty($auditData['trackingByService']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">🐛</span>
-            <span class="section-title">Tracking Services Detected ({{ count($auditData['trackingByService']) }})</span>
+            <span class="section-title">Tracking Services Detected <span class="section-count">({{ count($auditData['trackingByService']) }})</span></span>
         </div>
         <table class="audit-table">
             <thead>
                 <tr>
                     <th>Service</th>
                     <th style="width: 70px;">Severity</th>
-                    <th style="width: 70px;">Requests</th>
+                    <th style="width: 60px;">Requests</th>
                     <th>Example URL</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($auditData['trackingByService'] as $service => $info)
                 <tr>
-                    <td style="font-weight: 600;">{{ $service }}</td>
+                    <td style="font-weight: 600; color: #1a1d27;">{{ $service }}</td>
                     <td><span class="tag tag-{{ ($info['severity'] ?? '') === 'critical' ? 'critical' : 'medium' }}">{{ $info['severity'] ?? 'warning' }}</span></td>
-                    <td style="text-align: center;">{{ $info['count'] ?? (is_array($info) ? count($info) : 0) }}</td>
+                    <td style="text-align: center; font-weight: 600;">{{ $info['count'] ?? (is_array($info) ? count($info) : 0) }}</td>
                     <td style="font-size: 9px; word-break: break-all; color: #8890a4;">
                         @if(!empty($info['urls'][0]))
                             {{ \Illuminate\Support\Str::limit($info['urls'][0], 80) }}
@@ -660,14 +682,11 @@
     @if(!empty($auditData['cookies']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">🍪</span>
-            <span class="section-title">Cookies ({{ count($auditData['cookies']) }})</span>
+            <span class="section-title">Cookies <span class="section-count">({{ count($auditData['cookies']) }})</span></span>
         </div>
 
-        {{-- Tracking cookies first --}}
         @php
             $trackingCookies = array_filter($auditData['cookies'], fn($c) => ($c['classification']['type'] ?? '') === 'tracking');
-            $otherCookies = array_filter($auditData['cookies'], fn($c) => ($c['classification']['type'] ?? '') !== 'tracking');
         @endphp
 
         @if(count($trackingCookies) > 0)
@@ -675,7 +694,7 @@
             <strong style="color: #dc2626;">Tracking Cookies ({{ count($trackingCookies) }}):</strong><br>
             @foreach($trackingCookies as $cookie)
                 <span class="cookie-name">{{ $cookie['name'] ?? '' }}</span>
-                <span class="cookie-service">({{ $cookie['classification']['service'] ?? '' }} · {{ $cookie['domain'] ?? '' }})</span><br>
+                <span class="cookie-service">({{ $cookie['classification']['service'] ?? '' }} | {{ $cookie['domain'] ?? '' }})</span><br>
             @endforeach
         </div>
         @endif
@@ -687,7 +706,7 @@
                     <th>Domain</th>
                     <th style="width: 50px;">Type</th>
                     <th style="width: 50px;">Secure</th>
-                    <th style="width: 55px;">HttpOnly</th>
+                    <th style="width: 60px;">HttpOnly</th>
                 </tr>
             </thead>
             <tbody>
@@ -697,42 +716,45 @@
                     <td style="font-size: 10px; color: #8890a4;">{{ $cookie['domain'] ?? '' }}</td>
                     <td>
                         @if(($cookie['classification']['type'] ?? '') === 'tracking')
-                            <span class="tag tag-critical">Track</span>
+                            <span class="tag tag-critical">TRACK</span>
                         @else
-                            <span class="tag tag-low">Other</span>
+                            <span class="tag tag-low">OTHER</span>
                         @endif
                     </td>
-                    <td class="status-cell">{{ ($cookie['secure'] ?? false) ? '✅' : '❌' }}</td>
-                    <td class="status-cell">{{ ($cookie['httpOnly'] ?? false) ? '✅' : '❌' }}</td>
+                    <td class="status-cell {{ ($cookie['secure'] ?? false) ? 'status-pass' : 'status-fail' }}">
+                        {{ ($cookie['secure'] ?? false) ? 'YES' : 'NO' }}
+                    </td>
+                    <td class="status-cell {{ ($cookie['httpOnly'] ?? false) ? 'status-pass' : 'status-fail' }}">
+                        {{ ($cookie['httpOnly'] ?? false) ? 'YES' : 'NO' }}
+                    </td>
                 </tr>
                 @endforeach
             </tbody>
         </table>
         @if(count($auditData['cookies']) > 25)
             <div style="text-align: center; color: #8890a4; margin-top: 6px; font-size: 10px;">
-                … and {{ count($auditData['cookies']) - 25 }} more cookies
+                ... and {{ count($auditData['cookies']) - 25 }} more cookies
             </div>
         @endif
     </div>
     @endif
 
-    {{-- ══ ACCEPT/REJECT FLOWS ═══════════════════════════ --}}
+    {{-- ══ CONSENT FLOWS ═════════════════════════════════ --}}
     @if(!empty($auditData['scenarios']))
     <div class="section">
         <div class="section-header">
-            <span class="section-icon">🔄</span>
             <span class="section-title">Consent Flow Analysis</span>
         </div>
 
         @if(!empty($auditData['scenarios']['acceptAll']))
-        <div style="margin-bottom: 10px;">
-            <strong>Accept-All Flow:</strong>
+        <div style="margin-bottom: 12px;">
+            <strong style="color: #1a1d27;">Accept-All Flow:</strong>
             @if($auditData['scenarios']['acceptAll']['clicked'] ?? false)
-                Clicked "{{ $auditData['scenarios']['acceptAll']['clicked'] }}" —
+                Clicked "{{ $auditData['scenarios']['acceptAll']['clicked'] }}" &mdash;
                 @if(count($auditData['scenarios']['acceptAll']['postTracking'] ?? []) > 0)
-                    <span class="tag tag-pass">{{ count($auditData['scenarios']['acceptAll']['postTracking']) }} tracking request(s) after accept ✓</span>
+                    <span class="tag tag-pass">{{ count($auditData['scenarios']['acceptAll']['postTracking']) }} tracking request(s) after accept - CMP working</span>
                 @else
-                    <span class="tag tag-medium">No activity — CMP may not be working</span>
+                    <span class="tag tag-medium">No activity &mdash; CMP may not be working</span>
                 @endif
             @else
                 <span class="tag tag-medium">Could not find Accept button</span>
@@ -742,14 +764,14 @@
 
         @if(!empty($auditData['scenarios']['reject']))
         <div>
-            <strong>Reject Flow:</strong>
+            <strong style="color: #1a1d27;">Reject Flow:</strong>
             @if($auditData['scenarios']['reject']['clicked'] ?? false)
-                Clicked "{{ $auditData['scenarios']['reject']['clicked'] }}" —
+                Clicked "{{ $auditData['scenarios']['reject']['clicked'] }}" &mdash;
                 @if(count($auditData['scenarios']['reject']['postTracking'] ?? []) === 0)
-                    <span class="tag tag-pass">Clean — no tracking after rejection ✓</span>
+                    <span class="tag tag-pass">Clean &mdash; no tracking after rejection</span>
                 @else
                     <span class="tag tag-critical">{{ count($auditData['scenarios']['reject']['postTracking']) }} tracking request(s) AFTER rejection!</span>
-                    <div class="cookie-list" style="margin-top: 6px;">
+                    <div class="cookie-list" style="margin-top: 8px;">
                         @foreach($auditData['scenarios']['reject']['postTracking'] as $r)
                             <span class="cookie-name">{{ implode(', ', $r['labels'] ?? []) }}</span>
                             <span class="cookie-service">{{ \Illuminate\Support\Str::limit($r['url'] ?? '', 80) }}</span><br>
@@ -766,13 +788,12 @@
 
     {{-- ══ FOOTER ═════════════════════════════════════════ --}}
     <div class="footer">
-        <strong>LSM — Landeseiten Maintenance</strong><br>
-        Generated on {{ $generatedAt }} · {{ ucfirst($auditMode) }} Audit
-        @if($auditData['aiEnhanced'] ?? false) · AI-Enhanced Analysis @endif
+        <strong>LSM &mdash; Landeseiten Maintenance</strong><br>
+        Generated on {{ $generatedAt }} | {{ ucfirst($auditMode) }} Audit
+        @if($auditData['aiEnhanced'] ?? false) | AI-Enhanced Analysis @endif
         <br>
         <span style="font-size: 8px; margin-top: 4px; display: block;">
             This audit is a point-in-time snapshot and does not constitute legal advice.
-            Verification performed using headless browser with fresh browser contexts.
         </span>
     </div>
 </body>
