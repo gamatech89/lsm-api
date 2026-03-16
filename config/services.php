@@ -45,4 +45,9 @@ return [
         'key' => env('GDPR_AUDIT_SERVICE_KEY', 'lsm-gdpr-audit-2026-secure-key'),
     ],
 
+    'accessibility_audit' => [
+        'url' => env('ACCESSIBILITY_AUDIT_SERVICE_URL'),
+        'key' => env('ACCESSIBILITY_AUDIT_SERVICE_KEY', 'lsm-gdpr-audit-2026-secure-key'),
+    ],
+
 ];

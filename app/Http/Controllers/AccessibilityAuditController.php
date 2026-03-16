@@ -119,7 +119,7 @@ class AccessibilityAuditController extends Controller
         try {
             $response = \Illuminate\Support\Facades\Http::timeout(120)
                 ->withHeaders(['X-Api-Key' => $serviceKey])
-                ->post(rtrim($serviceUrl, '/') . '/audit', [
+                ->post(rtrim($serviceUrl, '/') . '/accessibility-audit', [
                     'url' => $url,
                 ]);
 
