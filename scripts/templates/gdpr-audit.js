@@ -86,6 +86,12 @@ module.exports = function gdprAuditTemplate(data) {
 <style>
   /* ── Reset ─────────────────────────────────── */
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 11px;
@@ -95,12 +101,14 @@ module.exports = function gdprAuditTemplate(data) {
     -webkit-font-smoothing: antialiased;
   }
 
-  /* ── Header ────────────────────────────────── */
+  .content {
+    padding: 28px 40px;
+  }
+
   .header {
     background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
     color: #fff;
-    padding: 40px 44px 36px;
-    margin: -20mm -15mm 0 -15mm;
+    padding: 44px 48px 36px;
     position: relative;
   }
   .header::after {
@@ -472,8 +480,9 @@ module.exports = function gdprAuditTemplate(data) {
   </div>
 </div>
 
+<div class="content">
 <!-- spacer after header -->
-<div style="height: 28px;"></div>
+<div style="height: 4px;"></div>
 
 <!-- ═══ SCORE ════════════════════════════════════ -->
 <div class="score-section">
@@ -737,6 +746,8 @@ ${(scenarios.acceptAll || scenarios.reject) ? `
   ${aiEnhanced ? ' | AI-Enhanced Analysis' : ''}<br>
   <div class="disclaimer">This audit is a point-in-time snapshot and does not constitute legal advice.</div>
 </div>
+
+</div><!-- .content -->
 
 </body>
 </html>`;

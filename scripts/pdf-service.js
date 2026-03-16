@@ -67,10 +67,10 @@ async function generatePdf(html, options = {}) {
       landscape: options.landscape || false,
       printBackground: options.printBackground !== false,
       margin: options.margin || {
-        top: '20mm',
-        bottom: '20mm',
-        left: '15mm',
-        right: '15mm',
+        top: '0',
+        bottom: '0',
+        left: '0',
+        right: '0',
       },
       preferCSSPageSize: true,
     });
