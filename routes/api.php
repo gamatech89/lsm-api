@@ -102,6 +102,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('projects.gdpr-audit.pdf');
         Route::post('/projects/{project}/gdpr-audit/{report}/save-report', [\App\Http\Controllers\GdprAuditController::class, 'saveToReports'])
             ->name('projects.gdpr-audit.save-report');
+        Route::get('/projects/{project}/gdpr-audit-status', [\App\Http\Controllers\GdprAuditController::class, 'checkAuditStatus'])
+            ->name('projects.gdpr-audit.status');
 
         // Accessibility Audit
         Route::post('/projects/{project}/accessibility-audit', [\App\Http\Controllers\AccessibilityAuditController::class, 'runAudit'])

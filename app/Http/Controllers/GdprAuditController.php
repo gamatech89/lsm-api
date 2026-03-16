@@ -45,22 +45,35 @@ class GdprAuditController extends Controller
             ], 422);
         }
 
-        set_time_limit(0);
-
         $mode = $request->input('mode', 'quick');
         $locale = $request->input('locale', 'en');
 
-        // ── Run the audit (remote microservice or local fallback) ──
+        // ── Dispatch async audit ──
         $serviceUrl = config('services.gdpr_audit.url');
         $serviceKey = config('services.gdpr_audit.key');
 
         if ($serviceUrl) {
-            // Production: call remote microservice
-            $auditData = $this->runRemoteAudit($serviceUrl, $serviceKey, $project->url, $mode);
-        } else {
-            // Local dev: run Puppeteer directly
-            $auditData = $this->runLocalAudit($project->url, $mode);
+            // Production: start async audit on VPS
+            $jobId = $this->startRemoteAudit($serviceUrl, $serviceKey, $project->url, $mode);
+
+            if (!$jobId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to start GDPR audit. The audit service may be unavailable.',
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'processing',
+                'jobId' => $jobId,
+                'message' => 'Audit started. Poll the status endpoint for results.',
+            ]);
         }
+
+        // Local dev: run synchronously (no timeout issue locally)
+        set_time_limit(0);
+        $auditData = $this->runLocalAudit($project->url, $mode);
 
         if (!$auditData) {
             return response()->json([
@@ -69,10 +82,123 @@ class GdprAuditController extends Controller
             ], 500);
         }
 
+        $auditData = $this->enhanceWithAi($auditData, $project->url, $locale);
+
+        $report = GdprAuditReport::create([
+            'project_id' => $project->id,
+            'audit_data' => $auditData,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'status' => 'completed',
+            'data' => $report,
+        ]);
+    }
+
+    /**
+     * Check the status of an async audit job.
+     * Called by the frontend via polling.
+     */
+    public function checkAuditStatus(Project $project, Request $request): JsonResponse
+    {
+        $request->validate([
+            'jobId' => 'required|string',
+            'locale' => 'in:en,de',
+        ]);
+
+        $jobId = $request->input('jobId');
+        $locale = $request->input('locale', 'en');
+
+        $serviceUrl = config('services.gdpr_audit.url');
+        $serviceKey = config('services.gdpr_audit.key');
+
+        if (!$serviceUrl) {
+            return response()->json(['success' => false, 'message' => 'Audit service not configured'], 500);
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(15)
+                ->withHeaders(['X-Api-Key' => $serviceKey])
+                ->get(rtrim($serviceUrl, '/') . '/audit-status/' . $jobId);
+
+            if (!$response->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'failed',
+                    'message' => 'Failed to check audit status',
+                ], $response->status());
+            }
+
+            $data = $response->json();
+
+            if ($data['status'] === 'processing') {
+                return response()->json([
+                    'success' => true,
+                    'status' => 'processing',
+                ]);
+            }
+
+            if ($data['status'] === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'failed',
+                    'message' => $data['error'] ?? 'Audit failed on the remote service.',
+                ]);
+            }
+
+            // status === 'completed' — process the result
+            $result = $data['result'] ?? null;
+            if (!$result || !($result['success'] ?? false)) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'failed',
+                    'message' => 'Audit completed but returned invalid data.',
+                ]);
+            }
+
+            $auditData = $result['data'];
+
+            // Handle base64 screenshot for AI
+            if (!empty($auditData['screenshotBase64'])) {
+                $tmpPath = sys_get_temp_dir() . '/gdpr-screenshot-' . time() . '.png';
+                file_put_contents($tmpPath, base64_decode($auditData['screenshotBase64']));
+                $auditData['screenshotPath'] = $tmpPath;
+                unset($auditData['screenshotBase64']);
+            }
+
+            // AI enhancement
+            $auditData = $this->enhanceWithAi($auditData, $project->url, $locale);
+
+            // Save the report
+            $report = GdprAuditReport::create([
+                'project_id' => $project->id,
+                'audit_data' => $auditData,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'status' => 'completed',
+                'data' => $report,
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('GDPR audit status check failed', ['message' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'status' => 'failed',
+                'message' => 'Failed to check audit status: ' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * AI enhancement pipeline: banner analysis + compliance summary.
+     */
+    private function enhanceWithAi(array $auditData, string $url, string $locale): array
+    {
         $screenshotPath = $auditData['screenshotPath'] ?? null;
         $aiEnhanced = false;
-
-        // ── AI Enhancement Pipeline ──
 
         // Step 1: AI banner analysis from screenshot
         if ($screenshotPath && file_exists($screenshotPath)) {
@@ -81,19 +207,19 @@ class GdprAuditController extends Controller
                 $aiEnhanced = true;
                 $auditData['aiBanner'] = $aiBanner;
                 Log::info('GDPR AI: Banner analysis succeeded', [
-                    'url' => $project->url,
+                    'url' => $url,
                     'bannerFound' => $aiBanner['bannerFound'] ?? false,
                 ]);
             }
         }
 
         // Step 2: AI compliance summary (locale-aware)
-        $aiSummary = $this->aiService->generateSummary($auditData, $project->url, $locale);
+        $aiSummary = $this->aiService->generateSummary($auditData, $url, $locale);
         if ($aiSummary) {
             $aiEnhanced = true;
             $auditData['aiSummary'] = $aiSummary;
             Log::info('GDPR AI: Summary generated', [
-                'url' => $project->url,
+                'url' => $url,
                 'score' => $aiSummary['score'] ?? null,
             ]);
         }
@@ -106,25 +232,17 @@ class GdprAuditController extends Controller
 
         $auditData['aiEnhanced'] = $aiEnhanced;
 
-        // Save the audit report
-        $report = GdprAuditReport::create([
-            'project_id' => $project->id,
-            'audit_data' => $auditData,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'data' => $report,
-        ]);
+        return $auditData;
     }
 
     /**
-     * Call the remote GDPR audit microservice.
+     * Start an async GDPR audit on the remote microservice.
+     * Returns the jobId, or null on failure.
      */
-    private function runRemoteAudit(string $serviceUrl, string $serviceKey, string $url, string $mode): ?array
+    private function startRemoteAudit(string $serviceUrl, string $serviceKey, string $url, string $mode): ?string
     {
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout($mode === 'full' ? 180 : 120)
+            $response = \Illuminate\Support\Facades\Http::timeout(15)
                 ->withHeaders(['X-Api-Key' => $serviceKey])
                 ->post(rtrim($serviceUrl, '/') . '/audit', [
                     'url' => $url,
@@ -132,29 +250,14 @@ class GdprAuditController extends Controller
                 ]);
 
             if (!$response->successful()) {
-                Log::error('GDPR remote audit failed', ['status' => $response->status(), 'body' => $response->body()]);
+                Log::error('GDPR remote audit start failed', ['status' => $response->status(), 'body' => $response->body()]);
                 return null;
             }
 
             $result = $response->json();
-            if (!$result || !($result['success'] ?? false)) {
-                Log::error('GDPR remote audit returned error', ['result' => $result]);
-                return null;
-            }
-
-            $auditData = $result['data'];
-
-            // If microservice returned a base64 screenshot, save to temp file for AI
-            if (!empty($auditData['screenshotBase64'])) {
-                $tmpPath = sys_get_temp_dir() . '/gdpr-screenshot-' . time() . '.png';
-                file_put_contents($tmpPath, base64_decode($auditData['screenshotBase64']));
-                $auditData['screenshotPath'] = $tmpPath;
-                unset($auditData['screenshotBase64']);
-            }
-
-            return $auditData;
+            return $result['jobId'] ?? null;
         } catch (\Throwable $e) {
-            Log::error('GDPR remote audit exception', ['message' => $e->getMessage()]);
+            Log::error('GDPR remote audit start exception', ['message' => $e->getMessage()]);
             return null;
         }
     }
