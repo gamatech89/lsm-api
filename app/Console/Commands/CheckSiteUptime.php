@@ -46,12 +46,12 @@ class CheckSiteUptime extends Command
         
         // Get projects to check
         // Only check projects where:
-        // - health_check_secret is set (plugin is connected)
         // - url is set
         // - status is not archived
         // - uptime_monitoring_enabled is true (per-project toggle)
-        $query = Project::whereNotNull('health_check_secret')
-            ->whereNotNull('url')
+        // Note: health_check_secret is NOT required — sites without the plugin
+        //       get a simple HTTP check of their URL instead.
+        $query = Project::whereNotNull('url')
             ->where('status', '!=', 'archived')
             ->where(function ($q) {
                 // Include projects where monitoring is enabled OR not set (default true)
@@ -100,10 +100,16 @@ class CheckSiteUptime extends Command
         $projectsList = $projects->values(); // Re-index for easier access
 
         // Build pool of requests
+        // Two-tier: plugin health endpoint if connected, otherwise simple URL check
         $responses = Http::pool(function ($pool) use ($projectsList, $timeout) {
             foreach ($projectsList as $index => $project) {
                 $baseUrl = rtrim($project->url, '/');
-                $healthUrl = "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}";
+
+                // If plugin is connected, check the health endpoint for rich data
+                // Otherwise, just check the project URL directly
+                $checkUrl = $project->health_check_secret
+                    ? "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}"
+                    : $baseUrl;
 
                 $pool->as($index)
                     ->timeout($timeout)
@@ -113,7 +119,7 @@ class CheckSiteUptime extends Command
                             'track_redirects' => true,
                         ],
                     ])
-                    ->get($healthUrl);
+                    ->get($checkUrl);
             }
         });
 
@@ -227,22 +233,33 @@ class CheckSiteUptime extends Command
             return 'down';
         }
 
-        // Success - parse health data
-        $healthData = $response->json() ?? [];
-        
-        // The plugin response wraps data inside a 'data' key
-        $data = $healthData['data'] ?? $healthData;
-
-        $project->update([
+        // Success — update project status
+        $updateData = [
             'last_health_check_at' => now(),
             'response_time_ms' => $responseTime,
-            'last_health_details' => $healthData,
-            'wp_version' => $data['wordpress']['version'] ?? null,
-            'php_version' => $data['php']['version'] ?? null,
-            'outdated_plugins_count' => $data['plugins']['outdated_count'] ?? 0,
-            'ssl_status' => ($data['ssl']['enabled'] ?? false) ? 'valid' : 'none',
             'health_status' => 'online',
-        ]);
+        ];
+
+        // If plugin is connected, parse rich health data from the endpoint
+        if ($project->health_check_secret) {
+            $healthData = $response->json() ?? [];
+            $data = $healthData['data'] ?? $healthData;
+
+            $updateData['last_health_details'] = $healthData;
+            $updateData['wp_version'] = $data['wordpress']['version'] ?? null;
+            $updateData['php_version'] = $data['php']['version'] ?? null;
+            $updateData['outdated_plugins_count'] = $data['plugins']['outdated_count'] ?? 0;
+            $updateData['ssl_status'] = ($data['ssl']['enabled'] ?? false) ? 'valid' : 'none';
+        } else {
+            // Simple URL check — just store basic status info
+            $updateData['last_health_details'] = [
+                'simple_check' => true,
+                'http_status' => $httpStatus,
+                'checked_at' => now()->toIso8601String(),
+            ];
+        }
+
+        $project->update($updateData);
 
         $this->logCheck($project, 'up', $httpStatus, $responseTime);
 

@@ -391,61 +391,77 @@ class ProjectController extends Controller
     {
         Gate::authorize('update', $project);
 
-        if (empty($project->health_check_secret)) {
-            return $this->errorResponse('Health monitoring secret not configured', 400);
-        }
-
         if (empty($project->url)) {
             return $this->errorResponse('Project URL not configured', 400);
         }
 
         try {
             $baseUrl = rtrim($project->url, '/');
-            $healthUrl = "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}";
+            $hasPlugin = !empty($project->health_check_secret);
+
+            // Two-tier: plugin health endpoint if connected, otherwise simple URL check
+            $checkUrl = $hasPlugin
+                ? "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}"
+                : $baseUrl;
             
             $startTime = microtime(true);
-            $response = Http::timeout(15)->get($healthUrl);
+            $response = Http::timeout(15)->get($checkUrl);
             $responseTime = round((microtime(true) - $startTime) * 1000);
             
             if ($response->successful()) {
-                $healthData = $response->json();
-                
-                // Real SSL certificate check
-                $sslInfo = $this->checkSSL($project->url);
-                
-                $project->update([
+                $updateData = [
                     'last_health_check_at' => now(),
                     'response_time_ms' => $responseTime,
-                    'last_health_details' => $healthData,
-                    'wp_version' => $healthData['wordpress']['version'] ?? null,
-                    'php_version' => $healthData['php']['version'] ?? null,
-                    'outdated_plugins_count' => $healthData['plugins']['outdated_count'] ?? 0,
-                    'ssl_status' => $sslInfo['status'],
-                    'ssl_expires_at' => $sslInfo['expires_at'] ?? null,
-                    'health_status' => $this->determineHealthStatus($healthData),
-                ]);
+                ];
+
+                $healthData = null;
+
+                if ($hasPlugin) {
+                    // Plugin connected — parse rich health data
+                    $healthData = $response->json();
+                    $sslInfo = $this->checkSSL($project->url);
+
+                    $updateData['last_health_details'] = $healthData;
+                    $updateData['wp_version'] = $healthData['wordpress']['version'] ?? null;
+                    $updateData['php_version'] = $healthData['php']['version'] ?? null;
+                    $updateData['outdated_plugins_count'] = $healthData['plugins']['outdated_count'] ?? 0;
+                    $updateData['ssl_status'] = $sslInfo['status'];
+                    $updateData['ssl_expires_at'] = $sslInfo['expires_at'] ?? null;
+                    $updateData['health_status'] = $this->determineHealthStatus($healthData);
+                } else {
+                    // Simple URL check — store basic info
+                    $updateData['last_health_details'] = [
+                        'simple_check' => true,
+                        'http_status' => $response->status(),
+                        'checked_at' => now()->toIso8601String(),
+                    ];
+                    $updateData['health_status'] = 'online';
+                }
+
+                $project->update($updateData);
 
                 // Log uptime check for historical tracking
                 \App\Models\UptimeCheck::create([
                     'project_id' => $project->id,
                     'status' => 'up',
-                    'http_status' => 200,
+                    'http_status' => $response->status(),
                     'response_time_ms' => $responseTime,
                     'checked_at' => now(),
                 ]);
 
-                // After successful health check, sync WP accounts if team members exist
-                // This handles the edge case where plugin was connected after team assignment
-                $hasTeam = $project->developers()->exists() || $project->managers()->exists();
-                if ($hasTeam) {
-                    SyncWpAccountsJob::dispatch($project, [], [], true);
+                // After successful health check, sync WP accounts if plugin connected and team members exist
+                if ($hasPlugin) {
+                    $hasTeam = $project->developers()->exists() || $project->managers()->exists();
+                    if ($hasTeam) {
+                        SyncWpAccountsJob::dispatch($project, [], [], true);
+                    }
                 }
 
                 return $this->successResponse([
                     'health_data' => $healthData,
                     'response_time_ms' => $responseTime,
                     'project' => new ProjectResource($project->fresh()),
-                ], 'Health check completed successfully');
+                ], $hasPlugin ? 'Health check completed successfully' : 'Site is online');
             } else {
                 $errorMessage = 'HTTP ' . $response->status();
                 
