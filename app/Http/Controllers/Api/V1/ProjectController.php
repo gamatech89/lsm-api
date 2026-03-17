@@ -488,7 +488,7 @@ class ProjectController extends Controller
                     'checked_at' => now(),
                 ]);
 
-                return $this->errorResponse('Health check endpoint returned error: ' . $errorMessage, 400);
+                return $this->errorResponse('Site returned error: ' . $errorMessage, 400);
             }
         } catch (\Exception $e) {
             $project->update([
