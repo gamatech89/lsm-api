@@ -82,7 +82,7 @@ class GdprAuditController extends Controller
             ], 500);
         }
 
-        $auditData = $this->enhanceWithAi($auditData, $project->url, $locale);
+        $auditData = $this->enhanceWithAi($auditData, $project->url, $locale, $mode);
 
         $report = GdprAuditReport::create([
             'project_id' => $project->id,
@@ -170,7 +170,7 @@ class GdprAuditController extends Controller
             // Try AI enhancement but don't let it block — timeout after 20s
             set_time_limit(60);
             try {
-                $auditData = $this->enhanceWithAi($auditData, $project->url, $locale);
+                $auditData = $this->enhanceWithAi($auditData, $project->url, $locale, $auditData['mode'] ?? 'quick');
             } catch (\Throwable $e) {
                 Log::warning('GDPR AI enhancement failed, saving without AI', ['error' => $e->getMessage()]);
                 $auditData['aiEnhanced'] = false;
@@ -201,13 +201,13 @@ class GdprAuditController extends Controller
     /**
      * AI enhancement pipeline: banner analysis + compliance summary.
      */
-    private function enhanceWithAi(array $auditData, string $url, string $locale): array
+    private function enhanceWithAi(array $auditData, string $url, string $locale, string $mode = 'quick'): array
     {
         $screenshotPath = $auditData['screenshotPath'] ?? null;
         $aiEnhanced = false;
 
-        // Step 1: AI banner analysis from screenshot
-        if ($screenshotPath && file_exists($screenshotPath)) {
+        // Step 1: AI banner analysis from screenshot (full mode only — quick uses mechanical detection)
+        if ($mode === 'full' && $screenshotPath && file_exists($screenshotPath)) {
             $aiBanner = $this->aiService->analyzeBanner($screenshotPath);
             if ($aiBanner) {
                 $aiEnhanced = true;
@@ -291,7 +291,7 @@ class GdprAuditController extends Controller
             : [$nodePath, $scriptPath, $url, "--mode={$mode}"];
 
         $process = new Process($command);
-        $process->setTimeout($mode === 'full' ? 180 : 120);
+        $process->setTimeout($mode === 'full' ? 180 : 60);
         $process->run();
 
         if (!$process->isSuccessful()) {

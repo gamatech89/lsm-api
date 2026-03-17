@@ -27,7 +27,7 @@ if (!TARGET) {
     process.exit(1);
 }
 
-const WAIT = MODE === 'full' ? 10000 : 5000; // Full waits longer for delayed scripts
+const WAIT = MODE === 'full' ? 10000 : 3000; // Full waits longer for delayed scripts
 
 // ── Tracking domain patterns ──
 const TRACKING = [
@@ -341,6 +341,13 @@ async function bannerCheck(browser) {
             '#CybotCookiebotDialog', '[class*="cookiebot"]',
             '#cmplz-cookiebanner', '[class*="cmplz"]',
             '#onetrust-banner-sdk',
+            '#usercentrics-root', '[class*="uc-"]',
+            '#didomi-host', '[class*="didomi"]',
+            '#truste-consent-track', '[class*="truste"]',
+            '#iubenda-cs-banner', '[class*="iubenda"]',
+            '.qc-cmp2-container', '#qc-cmp2-container',
+            '[class*="klaro"]', '#klaro',
+            '[class*="sp_choice"]', '#sp_message_container',
         ];
 
         const banner = document.querySelector(selectors.join(', '));
@@ -392,6 +399,12 @@ async function bannerCheck(browser) {
             else if (document.querySelector('#CybotCookiebotDialog')) result.solution = 'Cookiebot';
             else if (document.querySelector('#cmplz-cookiebanner')) result.solution = 'Complianz';
             else if (document.querySelector('#onetrust-banner-sdk')) result.solution = 'OneTrust';
+            else if (document.querySelector('#usercentrics-root')) result.solution = 'Usercentrics';
+            else if (document.querySelector('#didomi-host')) result.solution = 'Didomi';
+            else if (document.querySelector('#truste-consent-track')) result.solution = 'TrustArc';
+            else if (document.querySelector('#iubenda-cs-banner')) result.solution = 'Iubenda';
+            else if (document.querySelector('.qc-cmp2-container, #qc-cmp2-container')) result.solution = 'Quantcast Choice';
+            else if (document.querySelector('[class*="klaro"], #klaro')) result.solution = 'Klaro';
             else if (result.bannerFound) result.solution = 'Unknown CMP';
         }
 
@@ -681,31 +694,34 @@ async function main() {
     let screenshotPath = null;
 
     try {
-        // Capture a screenshot for AI analysis (fresh incognito context)
-        try {
-            const ssCtx = await browser.createBrowserContext();
-            const ssPage = await ssCtx.newPage();
-            await setupStealthPage(ssPage);
-            // Explicitly clear all storage to ensure banner shows fresh
-            const client = await ssPage.createCDPSession();
-            await client.send('Network.clearBrowserCookies');
-            await client.send('Network.clearBrowserCache');
-            await ssPage.setViewport({ width: 1280, height: 800 });
-            try { await ssPage.goto(TARGET, { waitUntil: 'load', timeout: 30000 }); } catch (e) { /* ok */ }
-            await new Promise(r => setTimeout(r, 5000));
-            screenshotPath = path.join(os.tmpdir(), `gdpr-screenshot-${Date.now()}.png`);
-            await ssPage.screenshot({ path: screenshotPath, fullPage: false });
-            await ssCtx.close();
-        } catch (e) {
-            screenshotPath = null; // Non-critical, continue without screenshot
+        // Screenshot capture: only for full mode (used by AI banner analysis)
+        if (MODE === 'full') {
+            try {
+                const ssCtx = await browser.createBrowserContext();
+                const ssPage = await ssCtx.newPage();
+                await setupStealthPage(ssPage);
+                const client = await ssPage.createCDPSession();
+                await client.send('Network.clearBrowserCookies');
+                await client.send('Network.clearBrowserCache');
+                await ssPage.setViewport({ width: 1280, height: 800 });
+                try { await ssPage.goto(TARGET, { waitUntil: 'load', timeout: 30000 }); } catch (e) { /* ok */ }
+                await new Promise(r => setTimeout(r, 5000));
+                screenshotPath = path.join(os.tmpdir(), `gdpr-screenshot-${Date.now()}.png`);
+                await ssPage.screenshot({ path: screenshotPath, fullPage: false });
+                await ssCtx.close();
+            } catch (e) {
+                screenshotPath = null; // Non-critical, continue without screenshot
+            }
         }
 
         // Always run pre-consent
         results.preConsent = await scenario(browser, 'Pre-Consent', null);
 
+        // Banner check: mechanical CSS-based detection (both modes)
+        results.banner = await bannerCheck(browser);
+
         if (MODE === 'full') {
-            // Full mode: run all 4 scenarios
-            results.banner = await bannerCheck(browser);
+            // Full mode: also run accept/reject scenarios
             results.acceptAll = await scenario(browser, 'Accept-All', ACCEPT_PATTERNS);
             results.reject = await scenario(browser, 'Reject', REJECT_PATTERNS);
         }
