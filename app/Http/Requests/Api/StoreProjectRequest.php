@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Store Project Request
@@ -21,6 +22,16 @@ class StoreProjectRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation (normalize URL).
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('url')) {
+            $this->merge(['url' => self::normalizeUrl($this->url)]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
@@ -29,7 +40,7 @@ class StoreProjectRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'url' => ['required', 'url', 'max:255'],
+            'url' => ['required', 'url', 'max:255', 'unique:projects,url'],
             'domain' => ['nullable', 'string', 'max:255'],
             'client_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string'],
@@ -38,9 +49,9 @@ class StoreProjectRequest extends FormRequest
             'health_status' => ['sometimes', 'string', 'in:online,down_error,updating'],
             'security_status' => ['sometimes', 'string', 'in:secure,monitoring,compromised,hacked'],
             
-            // External identifiers
-            'project_external_id' => ['nullable', 'string', 'max:50'],
-            'maintenance_id' => ['nullable', 'string', 'max:50'],
+            // External identifiers — unique when provided
+            'project_external_id' => ['nullable', 'string', 'max:50', 'unique:projects,project_external_id'],
+            'maintenance_id' => ['nullable', 'string', 'max:50', 'unique:projects,maintenance_id'],
             
             // Hosting info
             'hosting_provider' => ['nullable', 'string', 'max:255'],
@@ -60,5 +71,57 @@ class StoreProjectRequest extends FormRequest
             'tag_ids' => ['nullable', 'array'],
             'tag_ids.*' => ['exists:tags,id'],
         ];
+    }
+
+    /**
+     * Custom validation messages.
+     */
+    public function messages(): array
+    {
+        return [
+            'url.unique' => 'A project with this URL already exists.',
+            'project_external_id.unique' => 'A project with this External ID already exists.',
+            'maintenance_id.unique' => 'A project with this Maintenance ID already exists.',
+        ];
+    }
+
+    /**
+     * Normalize a URL for consistent duplicate detection.
+     * Strips www., trailing slashes, forces lowercase host, removes default ports.
+     */
+    public static function normalizeUrl(?string $url): ?string
+    {
+        if (empty($url)) return $url;
+
+        $url = trim($url);
+        $parsed = parse_url($url);
+        if (!$parsed || empty($parsed['host'])) return $url;
+
+        $scheme = strtolower($parsed['scheme'] ?? 'https');
+        $host = strtolower($parsed['host']);
+
+        // Strip www.
+        $host = preg_replace('/^www\./', '', $host);
+
+        // Remove default ports
+        $port = $parsed['port'] ?? null;
+        if (($scheme === 'http' && $port == 80) || ($scheme === 'https' && $port == 443)) {
+            $port = null;
+        }
+
+        // Rebuild
+        $normalized = $scheme . '://' . $host;
+        if ($port) {
+            $normalized .= ':' . $port;
+        }
+
+        $path = $parsed['path'] ?? '/';
+        // Remove trailing slash (except for root)
+        $path = rtrim($path, '/');
+        if (empty($path)) $path = '';
+
+        $normalized .= $path;
+
+        return $normalized;
     }
 }

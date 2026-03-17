@@ -572,6 +572,42 @@ class LsmService
         }
     }
 
+    // =========================================================================
+    // MEDIA LIBRARY
+    // =========================================================================
+
+    /**
+     * Scan for unused media attachments on the WordPress site.
+     * Note: Uses a longer timeout since scanning large media libraries can be slow.
+     */
+    public function getUnusedMedia(): ?array
+    {
+        if (!$this->isConfigured()) return null;
+
+        try {
+            $params = ['key' => $this->apiKey];
+
+            $response = Http::timeout(120)
+                ->withOptions(['allow_redirects' => true])
+                ->get($this->baseUrl . '/media/unused', $params);
+
+            return $this->handleResponse($response);
+        } catch (\Exception $e) {
+            Log::error("LSM API Error (media/unused): {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    /**
+     * Delete media attachments on the WordPress site.
+     *
+     * @param array $ids Array of attachment IDs to delete.
+     */
+    public function deleteMedia(array $ids): ?array
+    {
+        return $this->post('/media/delete', ['ids' => $ids]);
+    }
+
     /**
      * Legacy alias for backwards compatibility.
      * @deprecated Use getPhpErrors() instead

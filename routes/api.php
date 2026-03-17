@@ -198,6 +198,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/security-scans/progress', [V1\SecurityScanController::class, 'progress'])->name('security-scans.progress');
             Route::get('/security-scans/{securityScan}', [V1\SecurityScanController::class, 'show'])->name('security-scans.show');
             Route::delete('/security-scans/{securityScan}', [V1\SecurityScanController::class, 'destroy'])->name('security-scans.destroy');
+
+            // Media Library
+            Route::get('/unused-media', [V1\LsmController::class, 'getUnusedMedia'])->name('unused-media');
+            Route::post('/delete-media', [V1\LsmController::class, 'deleteMedia'])->name('delete-media');
         });
 
         // -------------------------------------------------
@@ -305,6 +309,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // -------------------------------------------------
         Route::get('/availability', [V1\AvailabilityController::class, 'index'])->name('availability.index');
         Route::post('/availability', [V1\AvailabilityController::class, 'store'])->name('availability.store');
+        Route::put('/availability/{availability}', [V1\AvailabilityController::class, 'update'])->name('availability.update');
+        Route::delete('/availability/{availability}', [V1\AvailabilityController::class, 'destroy'])->name('availability.destroy');
 
         // -------------------------------------------------
         // TEAM MANAGEMENT

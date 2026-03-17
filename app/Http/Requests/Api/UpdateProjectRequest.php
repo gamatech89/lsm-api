@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Update Project Request
@@ -22,15 +23,27 @@ class UpdateProjectRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation (normalize URL).
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('url')) {
+            $this->merge(['url' => StoreProjectRequest::normalizeUrl($this->url)]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
      */
     public function rules(): array
     {
+        $projectId = $this->route('project')?->id ?? $this->route('project');
+
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'url' => ['sometimes', 'url', 'max:255'],
+            'url' => ['sometimes', 'url', 'max:255', Rule::unique('projects', 'url')->ignore($projectId)],
             'domain' => ['nullable', 'string', 'max:255'],
             'client_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string'],
@@ -39,9 +52,9 @@ class UpdateProjectRequest extends FormRequest
             'health_status' => ['sometimes', 'string', 'in:online,down_error,updating'],
             'security_status' => ['sometimes', 'string', 'in:secure,monitoring,compromised,hacked'],
             
-            // External identifiers
-            'project_external_id' => ['nullable', 'string', 'max:50'],
-            'maintenance_id' => ['nullable', 'string', 'max:50'],
+            // External identifiers — unique when provided (excluding self)
+            'project_external_id' => ['nullable', 'string', 'max:50', Rule::unique('projects', 'project_external_id')->ignore($projectId)],
+            'maintenance_id' => ['nullable', 'string', 'max:50', Rule::unique('projects', 'maintenance_id')->ignore($projectId)],
             
             // Hosting info
             'hosting_provider' => ['nullable', 'string', 'max:255'],
@@ -63,6 +76,18 @@ class UpdateProjectRequest extends FormRequest
             'developer_ids.*' => ['exists:users,id'],
             'tag_ids' => ['nullable', 'array'],
             'tag_ids.*' => ['exists:tags,id'],
+        ];
+    }
+
+    /**
+     * Custom validation messages.
+     */
+    public function messages(): array
+    {
+        return [
+            'url.unique' => 'A project with this URL already exists.',
+            'project_external_id.unique' => 'A project with this External ID already exists.',
+            'maintenance_id.unique' => 'A project with this Maintenance ID already exists.',
         ];
     }
 }

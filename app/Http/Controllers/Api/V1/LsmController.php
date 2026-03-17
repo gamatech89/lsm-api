@@ -1015,4 +1015,64 @@ class LsmController extends Controller
             'message' => 'WP account sync has been queued. Accounts will be synced shortly.',
         ]);
     }
+
+    // =========================================================================
+    // MEDIA LIBRARY
+    // =========================================================================
+
+    /**
+     * Scan for unused media attachments on the WordPress site.
+     */
+    public function getUnusedMedia(Project $project): JsonResponse
+    {
+        Gate::authorize('view', $project);
+
+        $lsm = LsmService::for($project);
+
+        if (!$lsm->isConfigured()) {
+            return response()->json(['error' => 'LSM not configured'], 400);
+        }
+
+        $result = $lsm->getUnusedMedia();
+
+        if ($result === null) {
+            return response()->json(['error' => 'Failed to scan media library'], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $result,
+        ]);
+    }
+
+    /**
+     * Delete media attachments on the WordPress site.
+     */
+    public function deleteMedia(Request $request, Project $project): JsonResponse
+    {
+        Gate::authorize('update', $project);
+
+        $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer',
+        ]);
+
+        $lsm = LsmService::for($project);
+
+        if (!$lsm->isConfigured()) {
+            return response()->json(['error' => 'LSM not configured'], 400);
+        }
+
+        $result = $lsm->deleteMedia($request->input('ids'));
+
+        if ($result === null) {
+            return response()->json(['error' => 'Failed to delete media'], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $result,
+        ]);
+    }
 }
+
