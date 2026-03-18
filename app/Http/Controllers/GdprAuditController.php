@@ -379,9 +379,10 @@ class GdprAuditController extends Controller
     }
 
     /**
-     * Download the GDPR audit report as PDF.
+     * Download or view the GDPR audit report as PDF.
+     * Use ?view=1 to open inline in browser instead of downloading.
      */
-    public function downloadPdf(Project $project, GdprAuditReport $report)
+    public function downloadPdf(Project $project, GdprAuditReport $report, Request $request)
     {
         $auditData = $report->audit_data;
         $aiSummary = $auditData['aiSummary'] ?? [];
@@ -404,18 +405,23 @@ class GdprAuditController extends Controller
             $report->created_at->format('Y-m-d')
         );
 
+        $disposition = $request->query('view') ? 'inline' : 'attachment';
+
         // Try Puppeteer PDF service first
         $pdfBinary = $this->pdfService->generate('gdpr-audit', $templateData);
 
         if ($pdfBinary) {
             return response($pdfBinary)
                 ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+                ->header('Content-Disposition', "{$disposition}; filename=\"{$filename}\"");
         }
 
         // Fallback to DomPDF
         Log::warning('PdfService unavailable for GDPR audit, falling back to DomPDF');
         $pdf = Pdf::loadView('pdf.gdpr-audit', $templateData);
+        if ($disposition === 'inline') {
+            return $pdf->stream($filename);
+        }
         return $pdf->download($filename);
     }
 
