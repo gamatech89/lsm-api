@@ -216,6 +216,50 @@ class GdprAuditController extends Controller
                     'url' => $url,
                     'bannerFound' => $aiBanner['bannerFound'] ?? false,
                 ]);
+
+                // Merge AI result into mechanical data when AI detects a banner but mechanical didn't
+                $mechanicalDetected = $auditData['cookieBanner']['detected'] ?? $auditData['summary']['cookieBannerDetected'] ?? false;
+                if (($aiBanner['bannerFound'] ?? false) && !$mechanicalDetected) {
+                    Log::info('GDPR AI: Overriding mechanical banner detection with AI result', ['url' => $url]);
+
+                    // Override cookieBanner
+                    $auditData['cookieBanner'] = array_merge($auditData['cookieBanner'] ?? [], [
+                        'detected' => true,
+                        'solution' => $aiBanner['solution'] ?? 'Custom',
+                        'buttons' => $aiBanner['buttons'] ?? [],
+                        'aiOverride' => true,
+                    ]);
+
+                    // Override summary
+                    if (isset($auditData['summary'])) {
+                        $auditData['summary']['cookieBannerDetected'] = true;
+                        $auditData['summary']['cookieBannerSolution'] = [$aiBanner['solution'] ?? 'Custom'];
+                    }
+
+                    // Recalculate score: remove the -20 penalty for missing banner
+                    if (isset($auditData['score'])) {
+                        $auditData['score'] = min(100, $auditData['score'] + 20);
+                    }
+
+                    // Update checks to reflect AI-detected banner
+                    if (isset($auditData['checks'])) {
+                        foreach ($auditData['checks'] as &$check) {
+                            if (($check['name'] ?? '') === 'Cookie Consent Banner') {
+                                $check['status'] = 'pass';
+                                $check['severity'] = 'ok';
+                                $check['details'] = 'Cookie consent banner detected (AI): ' . ($aiBanner['solution'] ?? 'Custom');
+                            }
+                        }
+                        unset($check);
+                    }
+
+                    // Remove "No cookie consent banner detected" from issues
+                    if (isset($auditData['issues'])) {
+                        $auditData['issues'] = array_values(array_filter($auditData['issues'], function ($issue) {
+                            return stripos($issue, 'cookie consent banner') === false;
+                        }));
+                    }
+                }
             }
         }
 

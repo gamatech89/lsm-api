@@ -134,6 +134,23 @@ async function setupStealthPage(page) {
     await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
 }
 
+// Trigger lazy-loading frameworks (WP Rocket, etc.) by simulating user interaction
+async function triggerLazyLoading(page) {
+    await page.evaluate(() => {
+        // Simulate user interaction events to trigger WP Rocket's rocketlazyloadscript
+        const events = ['mousemove', 'touchstart', 'scroll', 'keydown'];
+        for (const evt of events) {
+            window.dispatchEvent(new Event(evt, { bubbles: true }));
+            document.dispatchEvent(new Event(evt, { bubbles: true }));
+        }
+        // Also scroll slightly to trigger scroll-based lazy loaders
+        window.scrollBy(0, 1);
+        window.scrollBy(0, -1);
+    });
+    // Wait for deferred scripts to execute and inject banner elements
+    await new Promise(r => setTimeout(r, 3000));
+}
+
 function labelRequest(url) {
     const out = [];
     for (const [re, name, severity] of TRACKING) {
@@ -309,7 +326,11 @@ async function bannerCheck(browser) {
 
     try { await page.goto(TARGET, { waitUntil: 'load', timeout: 30000 }); }
     catch (e) { /* ok */ }
-    await new Promise(r => setTimeout(r, 4000));
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Trigger lazy-loading (WP Rocket, etc.) to force deferred scripts like GTM to execute
+    await triggerLazyLoading(page);
+    await new Promise(r => setTimeout(r, 2000));
 
     // Try opening widget to reveal hidden banner
     const widgetClicked = await page.evaluate(() => {
@@ -333,6 +354,7 @@ async function bannerCheck(browser) {
 
         // Detect CMP banners (including Shadow DOM for Borlabs v3)
         const selectors = [
+            // Known CMP plugins
             '[class*="_brlbs"]', '[id*="BorlabsCookie"]', '[class*="borlabs"]',
             '[id*="CookieYes"]', '[class*="cky-"]',
             '[id*="CookieBox"]', '[class*="cookie-notice"]',
@@ -348,6 +370,24 @@ async function bannerCheck(browser) {
             '.qc-cmp2-container', '#qc-cmp2-container',
             '[class*="klaro"]', '#klaro',
             '[class*="sp_choice"]', '#sp_message_container',
+            // Additional CMPs
+            '#cmpbox', '#cmpbox2', '.cmpboxBG',
+            '#CookieInformation', '.CookieInformationDialog',
+            '#termly-code-snippet-support',
+            '.osano-cm-dialog', '[class*="osano"]',
+            '[class*="cc_banner"]', '[class*="cc_dialog"]',
+            // Generic consent patterns
+            '[id*="cookie-consent"]', '[id*="cookie-notice"]',
+            '[class*="cookie-consent"]', '[class*="cookie_consent"]',
+            '[id*="consent-banner"]', '[class*="consent-banner"]',
+            '[id*="gdpr"]', '[class*="gdpr"]',
+            '[id*="cookie-bar"]', '[class*="cookie-bar"]',
+            '[id*="cookie-popup"]', '[class*="cookie-popup"]',
+            '[id*="cookie-modal"]', '[class*="cookie-modal"]',
+            '[id*="cookie-overlay"]', '[class*="cookie-overlay"]',
+            '[id*="consent-modal"]', '[class*="consent-modal"]',
+            '[id*="consent-popup"]', '[class*="consent-popup"]',
+            '[id*="dsgvo"]', '[class*="dsgvo"]',
         ];
 
         const banner = document.querySelector(selectors.join(', '));
@@ -380,13 +420,58 @@ async function bannerCheck(browser) {
             }
         }
 
-        // Fallback text search
+        // Position-based detection: find fixed/sticky elements with consent keywords
+        if (!result.bannerFound) {
+            const consentKeywords = ['cookie', 'cookies', 'consent', 'datenschutz', 'einwilligung',
+                'zustimmen', 'ablehnen', 'privacy', 'dsgvo', 'gdpr', 'tracking'];
+
+            document.querySelectorAll('div, section, aside, dialog, [role="dialog"], [role="alertdialog"]').forEach(el => {
+                if (result.bannerFound) return;
+                const style = window.getComputedStyle(el);
+                const isFixed = style.position === 'fixed' || style.position === 'sticky';
+                const isVisible = el.offsetHeight > 60 && el.offsetWidth > 200;
+                const hasHighZIndex = parseInt(style.zIndex) > 100 || style.zIndex === 'auto';
+
+                if (isFixed && isVisible) {
+                    const textLower = (el.textContent || '').toLowerCase();
+                    const hasConsentText = consentKeywords.some(kw => textLower.includes(kw));
+                    // Also check for accept/reject buttons inside
+                    const btns = el.querySelectorAll('a, button');
+                    let hasConsentButtons = false;
+                    btns.forEach(b => {
+                        const bt = (b.textContent || '').toLowerCase().trim();
+                        if (bt.includes('akzeptier') || bt.includes('zustimmen') || bt.includes('ablehnen') ||
+                            bt.includes('accept') || bt.includes('reject') || bt.includes('deny') ||
+                            bt.includes('einverstanden') || bt.includes('agree')) {
+                            hasConsentButtons = true;
+                        }
+                    });
+
+                    if (hasConsentText || hasConsentButtons) {
+                        result.bannerFound = true;
+                        result.bannerText = el.textContent.substring(0, 600).replace(/\s+/g, ' ').trim();
+                        result.solution = result.solution || 'Custom';
+                    }
+                }
+            });
+        }
+
+        // Fallback text search (case-insensitive)
         if (!result.bannerFound) {
             document.querySelectorAll('div, section, aside, dialog').forEach(el => {
-                const t = el.textContent;
-                if ((t.includes('Privacy') || t.includes('cookie') || t.includes('Datenschutz') || t.includes('Einwilligung')) && el.offsetHeight > 200) {
-                    result.bannerFound = true;
-                    result.bannerText = t.substring(0, 600).replace(/\s+/g, ' ').trim();
+                if (result.bannerFound) return;
+                const tLower = (el.textContent || '').toLowerCase();
+                if ((tLower.includes('privacy') || tLower.includes('cookie') || tLower.includes('datenschutz') ||
+                     tLower.includes('einwilligung') || tLower.includes('consent') || tLower.includes('dsgvo')) &&
+                    el.offsetHeight > 80 && el.offsetHeight < 600) {
+                    // Extra check: element should look like a banner (not just regular content mentioning cookies)
+                    const style = window.getComputedStyle(el);
+                    const isOverlay = style.position === 'fixed' || style.position === 'sticky' ||
+                                     style.position === 'absolute' || parseInt(style.zIndex) > 50;
+                    if (isOverlay) {
+                        result.bannerFound = true;
+                        result.bannerText = el.textContent.substring(0, 600).replace(/\s+/g, ' ').trim();
+                    }
                 }
             });
         }
@@ -405,7 +490,11 @@ async function bannerCheck(browser) {
             else if (document.querySelector('#iubenda-cs-banner')) result.solution = 'Iubenda';
             else if (document.querySelector('.qc-cmp2-container, #qc-cmp2-container')) result.solution = 'Quantcast Choice';
             else if (document.querySelector('[class*="klaro"], #klaro')) result.solution = 'Klaro';
-            else if (result.bannerFound) result.solution = 'Unknown CMP';
+            else if (document.querySelector('#cmpbox, #cmpbox2')) result.solution = 'Consent Manager';
+            else if (document.querySelector('#CookieInformation')) result.solution = 'Cookie Information';
+            else if (document.querySelector('#termly-code-snippet-support')) result.solution = 'Termly';
+            else if (document.querySelector('.osano-cm-dialog')) result.solution = 'Osano';
+            else if (result.bannerFound) result.solution = 'Custom';
         }
 
         // Consent buttons (regular DOM)
@@ -705,7 +794,10 @@ async function main() {
                 await client.send('Network.clearBrowserCache');
                 await ssPage.setViewport({ width: 1280, height: 800 });
                 try { await ssPage.goto(TARGET, { waitUntil: 'load', timeout: 30000 }); } catch (e) { /* ok */ }
-                await new Promise(r => setTimeout(r, 5000));
+                await new Promise(r => setTimeout(r, 2000));
+                // Trigger lazy-loading (WP Rocket, etc.) so GTM-injected banners appear in screenshot
+                await triggerLazyLoading(ssPage);
+                await new Promise(r => setTimeout(r, 3000));
                 screenshotPath = path.join(os.tmpdir(), `gdpr-screenshot-${Date.now()}.png`);
                 await ssPage.screenshot({ path: screenshotPath, fullPage: false });
                 await ssCtx.close();
