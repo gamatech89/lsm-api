@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Resources\TodoResource;
 use App\Models\Project;
 use App\Models\Todo;
+use App\Models\TodoAttachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -55,7 +56,7 @@ class TodoController extends Controller
     {
         Gate::authorize('view', $project);
 
-        $query = $project->todos()->with(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
+        $query = $project->todos()->with(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
 
         // Filter by status
         if ($request->filled('status')) {
@@ -99,7 +100,7 @@ class TodoController extends Controller
     {
         Gate::authorize('view', $todo->project);
 
-        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
 
         return new TodoResource($todo);
     }
@@ -122,7 +123,9 @@ class TodoController extends Controller
             'status' => 'sometimes|in:pending,in_progress,in_review,completed,cancelled',
             'due_date' => 'nullable|date',
             'assignee_id' => 'nullable|exists:users,id',
-            'file' => 'nullable|file|max:10240', // 10MB max
+            'file' => 'nullable|file|max:10240', // Legacy single file
+            'files' => 'nullable|array|max:5',
+            'files.*' => 'file|max:10240', // 10MB per file
             'estimated_minutes' => 'nullable|integer|min:0',
             'library_resource_ids' => 'nullable|array',
             'library_resource_ids.*' => 'exists:library_resources,id',
@@ -131,6 +134,7 @@ class TodoController extends Controller
         $validated['project_id'] = $project->id;
         $validated['status'] = $validated['status'] ?? 'pending';
 
+        // Legacy single file support
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $path = $file->store('todos', 'local');
@@ -138,21 +142,33 @@ class TodoController extends Controller
             $validated['file_name'] = $file->getClientOriginalName();
         }
 
-        unset($validated['library_resource_ids']);
+        unset($validated['library_resource_ids'], $validated['files']);
 
         $todo = Todo::create($validated);
+
+        // Handle multiple file attachments
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $path = $file->store('todo-attachments', 'local');
+                $todo->attachments()->create([
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ]);
+            }
+        }
 
         // Sync library resources if provided
         if ($request->has('library_resource_ids')) {
             $todo->libraryResources()->sync($request->input('library_resource_ids', []));
         }
 
-        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
 
-        // Notify assignee if set and not the creator (optional check, but good practice)
-        // Here we just check if assignee exists
+        // Notify assignee if set
         if ($todo->assignee) {
-            $todo->load('project'); // Ensure project is loaded for notification
+            $todo->load('project');
             $todo->assignee->notify(new \App\Notifications\TodoAssignedNotification($todo));
         }
 
@@ -182,6 +198,10 @@ class TodoController extends Controller
             'due_date' => 'nullable|date',
             'assignee_id' => 'nullable|exists:users,id',
             'file' => 'nullable|file|max:10240',
+            'files' => 'nullable|array|max:5',
+            'files.*' => 'file|max:10240',
+            'delete_attachment_ids' => 'nullable|array',
+            'delete_attachment_ids.*' => 'integer',
             'estimated_minutes' => 'nullable|integer|min:0',
             'library_resource_ids' => 'nullable|array',
             'library_resource_ids.*' => 'exists:library_resources,id',
@@ -193,21 +213,45 @@ class TodoController extends Controller
             unset($validated['completed']);
         }
 
-        // Handle file upload
+        // Handle legacy single file upload
         if ($request->hasFile('file')) {
-            // Delete old file if exists
             if ($todo->file_path && Storage::disk('local')->exists($todo->file_path)) {
                 Storage::disk('local')->delete($todo->file_path);
             }
-            
             $file = $request->file('file');
             $path = $file->store('todos', 'local');
             $validated['file_path'] = $path;
             $validated['file_name'] = $file->getClientOriginalName();
         }
 
-        unset($validated['library_resource_ids']);
+        // Delete specified attachments
+        if ($request->has('delete_attachment_ids')) {
+            $attachmentsToDelete = $todo->attachments()
+                ->whereIn('id', $request->input('delete_attachment_ids'))
+                ->get();
+            foreach ($attachmentsToDelete as $attachment) {
+                if (Storage::disk('local')->exists($attachment->file_path)) {
+                    Storage::disk('local')->delete($attachment->file_path);
+                }
+                $attachment->delete();
+            }
+        }
+
+        unset($validated['library_resource_ids'], $validated['files'], $validated['delete_attachment_ids']);
         $todo->update($validated);
+
+        // Handle multiple file attachments
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $path = $file->store('todo-attachments', 'local');
+                $todo->attachments()->create([
+                    'file_path' => $path,
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                ]);
+            }
+        }
 
         // Sync library resources if provided
         if ($request->has('library_resource_ids')) {
@@ -220,7 +264,7 @@ class TodoController extends Controller
             $todo->assignee->notify(new \App\Notifications\TodoAssignedNotification($todo));
         }
 
-        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name']);
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
 
         return new TodoResource($todo);
     }
@@ -235,9 +279,16 @@ class TodoController extends Controller
     {
         Gate::authorize('update', $todo->project);
 
-        // Delete attached file if exists
+        // Delete attached file if exists (legacy)
         if ($todo->file_path && Storage::disk('local')->exists($todo->file_path)) {
             Storage::disk('local')->delete($todo->file_path);
+        }
+
+        // Delete all attachments
+        foreach ($todo->attachments as $attachment) {
+            if (Storage::disk('local')->exists($attachment->file_path)) {
+                Storage::disk('local')->delete($attachment->file_path);
+            }
         }
 
         $todo->delete();
@@ -246,10 +297,7 @@ class TodoController extends Controller
     }
 
     /**
-     * Download the attached file for a todo.
-     *
-     * @param Todo $todo
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
+     * Download the attached file for a todo (legacy single file).
      */
     public function download(Todo $todo)
     {
@@ -266,10 +314,7 @@ class TodoController extends Controller
     }
 
     /**
-     * Preview the attached file inline (for images).
-     *
-     * @param Todo $todo
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|JsonResponse
+     * Preview the attached file inline (legacy single file).
      */
     public function preview(Todo $todo)
     {
@@ -285,6 +330,71 @@ class TodoController extends Controller
         return response()->file($path, [
             'Content-Type' => $mimeType,
             'Content-Disposition' => 'inline; filename="' . ($todo->file_name ?? 'preview') . '"',
+        ]);
+    }
+
+    /**
+     * Delete a specific attachment from a todo.
+     */
+    public function deleteAttachment(Todo $todo, TodoAttachment $attachment): JsonResponse
+    {
+        Gate::authorize('update', $todo->project);
+
+        if ($attachment->todo_id !== $todo->id) {
+            return $this->errorResponse('Attachment does not belong to this todo', 403);
+        }
+
+        if (Storage::disk('local')->exists($attachment->file_path)) {
+            Storage::disk('local')->delete($attachment->file_path);
+        }
+
+        $attachment->delete();
+
+        return $this->successResponse(null, 'Attachment deleted successfully');
+    }
+
+    /**
+     * Download a specific attachment.
+     */
+    public function downloadAttachment(Todo $todo, TodoAttachment $attachment)
+    {
+        Gate::authorize('view', $todo->project);
+
+        if ($attachment->todo_id !== $todo->id) {
+            return $this->errorResponse('Attachment does not belong to this todo', 403);
+        }
+
+        if (!Storage::disk('local')->exists($attachment->file_path)) {
+            return $this->notFoundResponse('File not found');
+        }
+
+        return response()->download(
+            Storage::disk('local')->path($attachment->file_path),
+            $attachment->file_name
+        );
+    }
+
+    /**
+     * Preview a specific attachment inline.
+     */
+    public function previewAttachment(Todo $todo, TodoAttachment $attachment)
+    {
+        Gate::authorize('view', $todo->project);
+
+        if ($attachment->todo_id !== $todo->id) {
+            return $this->errorResponse('Attachment does not belong to this todo', 403);
+        }
+
+        if (!Storage::disk('local')->exists($attachment->file_path)) {
+            return $this->notFoundResponse('File not found');
+        }
+
+        $path = Storage::disk('local')->path($attachment->file_path);
+        $mimeType = $attachment->mime_type ?: (mime_content_type($path) ?: 'application/octet-stream');
+
+        return response()->file($path, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . $attachment->file_name . '"',
         ]);
     }
 }

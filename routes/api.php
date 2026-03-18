@@ -228,6 +228,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('todos.download');
         Route::get('/todos/{todo}/preview', [V1\TodoController::class, 'preview'])
             ->name('todos.preview');
+        Route::delete('/todos/{todo}/attachments/{attachment}', [V1\TodoController::class, 'deleteAttachment'])
+            ->name('todos.attachments.delete');
+        Route::get('/todos/{todo}/attachments/{attachment}/download', [V1\TodoController::class, 'downloadAttachment'])
+            ->name('todos.attachments.download');
+        Route::get('/todos/{todo}/attachments/{attachment}/preview', [V1\TodoController::class, 'previewAttachment'])
+            ->name('todos.attachments.preview');
 
         // -------------------------------------------------
         // RESOURCES (nested under projects)

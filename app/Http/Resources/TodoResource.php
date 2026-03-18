@@ -29,10 +29,13 @@ class TodoResource extends JsonResource
             'completed' => $this->completed,
             'due_date' => $this->due_date?->toISOString(),
             
-            // File attachment
+            // File attachment (legacy single module support)
             'file_path' => $this->file_path,
             'file_name' => $this->file_name,
-            'has_attachment' => !empty($this->file_path),
+            'has_attachment' => !empty($this->file_path) || ($this->relationLoaded('attachments') && $this->attachments->isNotEmpty()),
+            
+            // Multiple attachments
+            'attachments' => $this->whenLoaded('attachments'),
             
             // Linked library resources
             'library_resources' => LibraryResourceResource::collection($this->whenLoaded('libraryResources')),

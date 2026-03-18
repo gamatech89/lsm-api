@@ -60,6 +60,14 @@ class Todo extends Model
     }
 
     /**
+     * Get the file attachments for this todo.
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TodoAttachment::class);
+    }
+
+    /**
      * Get the completed attribute.
      */
     public function getCompletedAttribute(): bool
