@@ -166,14 +166,18 @@ class MaintenanceReportController extends Controller
     }
 
     /**
-     * Download the maintenance report as PDF.
+     * Download or view the maintenance report as PDF.
+     * Use ?view=1 to open inline in browser instead of downloading.
      *
      * @param MaintenanceReport $maintenanceReport
+     * @param Request $request
      * @return \Illuminate\Http\Response
      */
-    public function downloadPdf(MaintenanceReport $maintenanceReport)
+    public function downloadPdf(MaintenanceReport $maintenanceReport, Request $request)
     {
         Gate::authorize('view', $maintenanceReport->project);
+
+        $disposition = $request->query('view') ? 'inline' : 'attachment';
 
         // If an uploaded PDF exists, serve it directly
         if ($maintenanceReport->pdf_path && Storage::disk('local')->exists($maintenanceReport->pdf_path)) {
@@ -182,6 +186,13 @@ class MaintenanceReportController extends Controller
                 $maintenanceReport->project?->name ?? $maintenanceReport->project_id,
                 $maintenanceReport->report_date
             );
+
+            if ($disposition === 'inline') {
+                $content = Storage::disk('local')->get($maintenanceReport->pdf_path);
+                return response($content)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', "inline; filename=\"{$filename}\"");
+            }
 
             return Storage::disk('local')->download($maintenanceReport->pdf_path, $filename);
         }
@@ -199,6 +210,9 @@ class MaintenanceReportController extends Controller
             $maintenanceReport->report_date
         );
 
+        if ($disposition === 'inline') {
+            return $pdf->stream($filename);
+        }
         return $pdf->download($filename);
     }
 

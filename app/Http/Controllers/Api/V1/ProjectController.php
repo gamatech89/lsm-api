@@ -103,7 +103,15 @@ class ProjectController extends Controller
         }
 
         $perPage = min($request->integer('per_page', 15), 100);
-        $projects = $query->orderBy('updated_at', 'desc')->paginate($perPage);
+
+        // Dynamic sorting
+        $allowedSorts = ['created_at', 'updated_at', 'name', 'pending_todos_count'];
+        $sortBy = in_array($request->input('sort_by'), $allowedSorts)
+            ? $request->input('sort_by')
+            : 'updated_at';
+        $sortDir = $request->input('sort_dir') === 'asc' ? 'asc' : 'desc';
+
+        $projects = $query->orderBy($sortBy, $sortDir)->paginate($perPage);
 
         return ProjectResource::collection($projects);
     }
