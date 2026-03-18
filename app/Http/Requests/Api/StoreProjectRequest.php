@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Models\Project;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,7 +41,21 @@ class StoreProjectRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'url' => ['required', 'url', 'max:255', 'unique:projects,url'],
+            'url' => ['required', 'url', 'max:255', function (string $attribute, mixed $value, \Closure $fail) {
+                // Normalize-aware duplicate check: compare normalized incoming URL
+                // against normalized DB URLs (handles www., trailing slash, case differences)
+                $normalizedNew = self::normalizeUrl($value);
+                $existing = Project::whereNotNull('url')
+                    ->where('url', '!=', '')
+                    ->pluck('url', 'id');
+                
+                foreach ($existing as $id => $dbUrl) {
+                    if (self::normalizeUrl($dbUrl) === $normalizedNew) {
+                        $fail('A project with this URL already exists.');
+                        return;
+                    }
+                }
+            }],
             'domain' => ['nullable', 'string', 'max:255'],
             'client_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string'],

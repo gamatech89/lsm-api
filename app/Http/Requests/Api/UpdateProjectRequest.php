@@ -39,11 +39,32 @@ class UpdateProjectRequest extends FormRequest
      */
     public function rules(): array
     {
-        $projectId = $this->route('project')?->id ?? $this->route('project');
+        $routeProject = $this->route('project');
+        $projectId = $routeProject instanceof \App\Models\Project
+            ? $routeProject->id
+            : (int) $routeProject;
 
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'url' => ['sometimes', 'url', 'max:255', Rule::unique('projects', 'url')->ignore($projectId)],
+            'url' => ['sometimes', 'url', 'max:255', function (string $attribute, mixed $value, \Closure $fail) use ($projectId) {
+                // Normalize-aware duplicate check (excluding self)
+                $normalizedNew = StoreProjectRequest::normalizeUrl($value);
+                $query = \App\Models\Project::whereNotNull('url')
+                    ->where('url', '!=', '');
+                
+                if ($projectId) {
+                    $query->where('id', '!=', $projectId);
+                }
+                
+                $existing = $query->pluck('url', 'id');
+                
+                foreach ($existing as $id => $dbUrl) {
+                    if (StoreProjectRequest::normalizeUrl($dbUrl) === $normalizedNew) {
+                        $fail('A project with this URL already exists.');
+                        return;
+                    }
+                }
+            }],
             'domain' => ['nullable', 'string', 'max:255'],
             'client_email' => ['nullable', 'email', 'max:255'],
             'notes' => ['nullable', 'string'],
