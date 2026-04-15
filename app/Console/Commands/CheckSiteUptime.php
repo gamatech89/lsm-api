@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Models\UptimeCheck;
 use App\Notifications\SiteDownNotification;
+use App\Notifications\SiteRecoveredNotification;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -233,7 +234,9 @@ class CheckSiteUptime extends Command
             return 'down';
         }
 
-        // Success — update project status
+        // Success — track if we're recovering from a confirmed outage before overwriting status
+        $wasDown = $project->health_status === 'down_error';
+
         $updateData = [
             'last_health_check_at' => now(),
             'response_time_ms' => $responseTime,
@@ -260,6 +263,10 @@ class CheckSiteUptime extends Command
         }
 
         $project->update($updateData);
+
+        if ($wasDown) {
+            $this->sendSiteRecoveredNotification($project);
+        }
 
         $this->logCheck($project, 'up', $httpStatus, $responseTime);
 
@@ -337,6 +344,16 @@ class CheckSiteUptime extends Command
      */
     protected function handleException(Project $project, \Exception $e): string
     {
+        // Internal errors (DB write failures, etc.) are not site outages.
+        // Log them but do not mark the site as down or send notifications.
+        if ($e instanceof \Illuminate\Database\QueryException || $e instanceof \PDOException) {
+            Log::error("Internal error during uptime check for {$project->name}", [
+                'project_id' => $project->id,
+                'error' => $e->getMessage(),
+            ]);
+            return 'error';
+        }
+
         $errorMessage = $this->parseConnectionError($e->getMessage());
 
         // Confirm-before-alert: only mark as down_error if already confirming
@@ -422,20 +439,60 @@ class CheckSiteUptime extends Command
             return;
         }
 
-        // ── Cooldown: only send one notification per project per hour ──
-        // Check if a SiteDownNotification was already sent for this project recently.
+        // Cooldown: only send one notification per project per cooldown window.
+        $cooldownMinutes = config('uptime.notification_cooldown_minutes', 60);
         $recentNotification = \Illuminate\Support\Facades\DB::table('notifications')
             ->where('type', SiteDownNotification::class)
             ->where('data->project_id', $project->id)
-            ->where('created_at', '>=', now()->subHour())
+            ->where('created_at', '>=', now()->subMinutes($cooldownMinutes))
             ->exists();
 
         if ($recentNotification) {
-            return; // Already notified within the last hour — skip
+            return;
         }
 
-        // Collect team members
+        foreach ($this->getProjectMembers($project) as $member) {
+            $member->notify(new SiteDownNotification($project, $errorType, $errorMessage, $httpStatus));
+        }
+    }
+
+    /**
+     * Send a recovery notification when a previously confirmed-down site comes back online.
+     */
+    protected function sendSiteRecoveredNotification(Project $project): void
+    {
+        $prefs = $project->notification_preferences ?? [];
+        $triggers = $prefs['triggers'] ?? [];
+        $siteDown = $triggers['site_down'] ?? ['enabled' => true];
+
+        if (empty($siteDown['enabled'])) {
+            return;
+        }
+
+        // Calculate approximate downtime from the last confirmed-down check
+        $firstDownCheck = UptimeCheck::where('project_id', $project->id)
+            ->whereIn('status', ['down', 'error'])
+            ->orderBy('checked_at', 'asc')
+            ->where('checked_at', '>=', now()->subDay()) // limit search window to 24h
+            ->first();
+
+        $downtimeDuration = $firstDownCheck
+            ? now()->diffForHumans($firstDownCheck->checked_at, true)
+            : 'unknown';
+
+        foreach ($this->getProjectMembers($project) as $member) {
+            $member->notify(new SiteRecoveredNotification($project, $downtimeDuration));
+        }
+    }
+
+    /**
+     * Collect all team members who should be notified for a project.
+     * Includes managers, developers, and always admins.
+     */
+    protected function getProjectMembers(Project $project)
+    {
         $members = collect();
+
         foreach ($project->managers as $manager) {
             $members->push($manager);
         }
@@ -449,13 +506,9 @@ class CheckSiteUptime extends Command
         foreach ($project->developers as $dev) {
             $members->push($dev);
         }
-        // Always notify admins for site down
         $members = $members->merge(User::where('role', 'admin')->get());
-        $members = $members->filter()->unique('id');
 
-        foreach ($members as $member) {
-            $member->notify(new SiteDownNotification($project, $errorType, $errorMessage, $httpStatus));
-        }
+        return $members->filter()->unique('id');
     }
 
     /**

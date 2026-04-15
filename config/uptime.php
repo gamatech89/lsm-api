@@ -27,6 +27,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
+
+    // Minutes between repeated "site down" notifications for the same project.
+    // Prevents spam during prolonged outages — one alert fires, then silence
+    // until the cooldown expires or the site recovers.
+    // Set via UPTIME_NOTIFICATION_COOLDOWN in .env (default: 60 minutes).
+    'notification_cooldown_minutes' => env('UPTIME_NOTIFICATION_COOLDOWN', 60),
+
+    /*
+    |--------------------------------------------------------------------------
     | Alerting (Future)
     |--------------------------------------------------------------------------
     */
