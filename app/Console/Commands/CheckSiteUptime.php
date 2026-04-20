@@ -21,11 +21,13 @@ use Illuminate\Support\Facades\Log;
  */
 class CheckSiteUptime extends Command
 {
-    protected $signature = 'sites:check-uptime 
+    protected $signature = 'sites:check-uptime
                             {--project= : Check specific project ID only}
                             {--concurrency= : Override concurrency setting}';
 
     protected $description = 'Check uptime for all monitored WordPress sites (parallel)';
+
+    protected int $currentTimeout = 15;
 
     /**
      * Execute the command.
@@ -44,7 +46,8 @@ class CheckSiteUptime extends Command
             ?? \App\Models\Setting::getOrConfig('uptime.concurrency', 'uptime.concurrency') 
             ?? 10;
         $timeout = \App\Models\Setting::getOrConfig('uptime.timeout', 'uptime.timeout') ?? 15;
-        
+        $this->currentTimeout = (int) $timeout;
+
         // Get projects to check
         // Only check projects where:
         // - url is set
@@ -173,6 +176,12 @@ class CheckSiteUptime extends Command
             }
         }
 
+        // 429 = rate limited — the server is UP and responding, just throttling our checker.
+        // Treat as success to avoid false "site down" alerts.
+        if ($httpStatus === 429) {
+            return $this->handleRateLimited($project, $httpStatus, $responseTime);
+        }
+
         // Check for errors (4xx, 5xx)
         if (!$response->successful()) {
             $errorMessage = "HTTP {$httpStatus}";
@@ -180,6 +189,46 @@ class CheckSiteUptime extends Command
             $body = $response->body();
             if (str_contains(strtolower($body), 'maintenance')) {
                 $errorMessage = "Maintenance mode active";
+            }
+
+            // If the health endpoint failed but the base URL is reachable, the plugin is broken
+            // (deactivated, updated, REST API disabled) — the site itself is fine.
+            if ($project->health_check_secret && $this->checkBaseUrl($project)) {
+                $wasDown = $project->health_status === 'down_error';
+                $project->update([
+                    'last_health_check_at' => now(),
+                    'response_time_ms' => $responseTime,
+                    'health_status' => 'online',
+                    'last_health_details' => [
+                        'simple_check' => true,
+                        'http_status' => $httpStatus,
+                        'health_endpoint_error' => $errorMessage,
+                        'checked_at' => now()->toIso8601String(),
+                    ],
+                ]);
+                $this->logCheck($project, 'up', $httpStatus, $responseTime, 'Health endpoint error (base URL is accessible)');
+                if ($wasDown) {
+                    $this->sendSiteRecoveredNotification($project);
+                }
+                if ($this->getOutput()->isVerbose()) {
+                    $this->warn("⚠️  {$project->name}: Health endpoint {$httpStatus} but base URL is up");
+                }
+                return 'up';
+            }
+
+            // For plain URL checks (no plugin), retry once on HTTP errors before entering confirming_down.
+            // 5xx codes (503, 502, etc.) are often transient. Health-endpoint sites already got
+            // the checkBaseUrl() fallback above, so no double-retry for those.
+            if (!$project->health_check_secret
+                && $project->health_status === 'online'
+                && $this->retrySingleCheck($project)
+            ) {
+                $this->logCheck($project, 'up', $httpStatus, $responseTime, 'Recovered on immediate retry');
+                $project->update(['last_health_check_at' => now(), 'health_status' => 'online']);
+                if ($this->getOutput()->isVerbose()) {
+                    $this->warn("🔄 {$project->name}: HTTP {$httpStatus} but recovered on retry");
+                }
+                return 'up';
             }
 
             // Confirm-before-alert: only mark as down_error if already confirming
@@ -288,6 +337,17 @@ class CheckSiteUptime extends Command
             $errorMessage = $this->parseConnectionError($response->getMessage());
         } elseif ($response instanceof \Exception) {
             $errorMessage = $this->parseConnectionError($response->getMessage());
+        }
+
+        // Immediate retry to filter transient network/DNS glitches.
+        // Only retry when the site was previously online — no point retrying an already-confirmed failure.
+        if ($project->health_status === 'online' && $this->retrySingleCheck($project)) {
+            $this->logCheck($project, 'up', null, null, 'Recovered on immediate retry');
+            $project->update(['last_health_check_at' => now(), 'health_status' => 'online']);
+            if ($this->getOutput()->isVerbose()) {
+                $this->warn("🔄 {$project->name}: transient failure, recovered on retry");
+            }
+            return 'up';
         }
 
         // Confirm-before-alert: only mark as down_error if already confirming
@@ -512,6 +572,71 @@ class CheckSiteUptime extends Command
     }
 
     /**
+     * Handle a 429 rate-limited response: the server is up, just throttling our checker.
+     */
+    protected function handleRateLimited(Project $project, int $httpStatus, ?int $responseTime): string
+    {
+        $wasDown = $project->health_status === 'down_error';
+
+        $project->update([
+            'last_health_check_at' => now(),
+            'response_time_ms' => $responseTime,
+            'health_status' => 'online',
+            'last_health_details' => [
+                'simple_check' => true,
+                'http_status' => $httpStatus,
+                'note' => 'Rate limited (429) — server is responding',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        $this->logCheck($project, 'up', $httpStatus, $responseTime, 'Rate limited (429)');
+
+        if ($wasDown) {
+            $this->sendSiteRecoveredNotification($project);
+        }
+
+        if ($this->getOutput()->isVerbose()) {
+            $this->info("✅ {$project->name}: rate limited (429) — treated as up");
+        }
+
+        return 'up';
+    }
+
+    /**
+     * Check if the project's base URL is reachable (used as fallback when the health endpoint fails).
+     * Uses a shorter timeout since this is a secondary check.
+     */
+    protected function checkBaseUrl(Project $project): bool
+    {
+        try {
+            $baseUrl = rtrim($project->url, '/');
+            $response = Http::timeout(min($this->currentTimeout, 10))->get($baseUrl);
+            return $response->successful() || $response->status() === 429;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Immediately retry a check for a project to filter out transient failures.
+     * Uses a shorter timeout since this is a quick connectivity probe.
+     */
+    protected function retrySingleCheck(Project $project): bool
+    {
+        try {
+            $baseUrl = rtrim($project->url, '/');
+            $checkUrl = $project->health_check_secret
+                ? "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}"
+                : $baseUrl;
+            $response = Http::timeout(min($this->currentTimeout, 10))->get($checkUrl);
+            return $response->successful() || $response->status() === 429;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Parse connection error into user-friendly message.
      */
     protected function parseConnectionError(string $message): string
@@ -520,7 +645,7 @@ class CheckSiteUptime extends Command
             return 'Connection timeout - site may be slow or down';
         }
         if (str_contains($message, 'Could not resolve')) {
-            return 'DNS resolution failed - domain may not exist';
+            return 'DNS resolution failed - verify domain exists and DNS is propagated';
         }
         if (str_contains($message, 'Connection refused')) {
             return 'Connection refused - server may be down';

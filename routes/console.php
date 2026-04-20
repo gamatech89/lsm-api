@@ -38,6 +38,25 @@ Schedule::command('projects:health-check --deep --notify')
 
 /*
 |--------------------------------------------------------------------------
+| SSL Expiry Alerts
+|--------------------------------------------------------------------------
+|
+| Checks all projects for SSL certificates expiring within 30 days and
+| sends alerts. Runs daily at 09:00, after the morning health check has
+| refreshed ssl_expires_at values.
+|
+*/
+
+Schedule::command('sites:check-ssl-expiry')
+    ->dailyAt('09:00')
+    ->timezone('Europe/Berlin')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('ssl-expiry-check')
+    ->onOneServer();
+
+/*
+|--------------------------------------------------------------------------
 | Live Uptime Monitoring
 |--------------------------------------------------------------------------
 |
