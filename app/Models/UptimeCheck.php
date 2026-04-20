@@ -81,7 +81,7 @@ class UptimeCheck extends Model
         }
 
         $upCount = $checks->where('status', 'up')->count();
-        $totalCount = $checks->count();
+        $totalCount = $checks->whereNotIn('status', ['confirming'])->count();
 
         return round(($upCount / $totalCount) * 100, 2);
     }
@@ -95,7 +95,8 @@ class UptimeCheck extends Model
             ->lastDays($days)
             ->get();
 
-        $total = $checks->count();
+        // Exclude 'confirming' — it's an in-progress state, not a completed check result.
+        $total = $checks->whereNotIn('status', ['confirming'])->count();
         $up = $checks->where('status', 'up')->count();
         $redirect = $checks->where('status', 'redirect')->count();
         $down = $checks->whereIn('status', ['down', 'error', 'timeout'])->count();
