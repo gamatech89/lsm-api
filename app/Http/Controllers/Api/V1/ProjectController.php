@@ -188,6 +188,7 @@ class ProjectController extends Controller
             'libraryResources',
             'todos.assignee:id,name,email',
             'todos.attachments',
+            'todos.libraryResources',
             'manager:id,name,email',
             'managers:id,name,email',
             'developer:id,name,email',
