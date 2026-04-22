@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Notifications\WelcomeNotification;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password as PasswordBroker;
@@ -86,7 +87,8 @@ class TeamController extends Controller
         $tagIds = $validated['tag_ids'] ?? [];
         unset($validated['tag_ids']);
 
-        $validated['password'] = Hash::make($validated['password']);
+        $plainPassword = $validated['password'];
+        $validated['password'] = Hash::make($plainPassword);
         $validated['email_verified_at'] = now(); // Auto-verify for admin-created users
 
         $user = User::create($validated);
@@ -97,6 +99,14 @@ class TeamController extends Controller
         }
 
         $user->load('tags');
+
+        // Send welcome email with login credentials and password reset link
+        try {
+            $token = app('auth.password.broker')->createToken($user);
+            $user->notify(new WelcomeNotification($token, $plainPassword));
+        } catch (\Exception $e) {
+            \Log::warning('Failed to send welcome email', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+        }
 
         return $this->createdResponse(
             new UserResource($user),

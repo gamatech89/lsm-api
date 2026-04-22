@@ -20,6 +20,7 @@ class CredentialController extends Controller
 {
     /**
      * Display a listing of credentials for a project.
+     * Developers only see credentials they have explicit access grants for.
      *
      * @param Project $project
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
@@ -28,7 +29,15 @@ class CredentialController extends Controller
     {
         Gate::authorize('view', $project);
 
-        return CredentialResource::collection($project->credentials);
+        $user = auth()->user();
+
+        $query = $project->credentials()->with('accessGrants.user:id,name,email');
+
+        if ($user->role === 'developer' && !$user->isAdmin()) {
+            $query->whereHas('accessGrants', fn($q) => $q->where('user_id', $user->id));
+        }
+
+        return CredentialResource::collection($query->get());
     }
 
     /**
@@ -145,7 +154,7 @@ class CredentialController extends Controller
      */
     public function reveal(Credential $credential): JsonResponse
     {
-        Gate::authorize('view', $credential->project);
+        Gate::authorize('view', $credential);
 
         // Log every password reveal for audit trail
         activity()

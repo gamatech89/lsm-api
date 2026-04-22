@@ -27,7 +27,6 @@ class VaultController extends Controller
         
         $query = Credential::with('project:id,name,url')
             ->whereHas('project', function ($q) use ($user) {
-                // Filter by projects the user can access
                 if ($user->role === 'developer') {
                     $q->where(function ($sub) use ($user) {
                         $sub->where('developer_id', $user->id)
@@ -41,6 +40,11 @@ class VaultController extends Controller
                 }
                 // Admin sees all - no filter
             });
+
+        // Developers only see credentials they have explicit access grants for
+        if ($user->role === 'developer' && !$user->isAdmin()) {
+            $query->whereHas('accessGrants', fn($q) => $q->where('user_id', $user->id));
+        }
 
         // Filter by type
         if ($request->filled('type')) {

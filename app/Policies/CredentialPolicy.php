@@ -30,53 +30,45 @@ class CredentialPolicy
 
     /**
      * Determine whether the user can view the model.
-     * Users can view credentials for projects they manage or develop.
+     * Managers see all credentials on their projects.
+     * Developers only see credentials with an explicit access grant.
      */
     public function view(User $user, Credential $credential): bool
     {
         $project = $credential->project;
-        
+
         if ($user->role === 'manager') {
             return $project->managers->contains('id', $user->id);
         }
-        
+
         if ($user->role === 'developer') {
-            return $project->developers()->where('user_id', $user->id)->exists();
+            $onProject = $project->developer_id === $user->id
+                || $project->developers()->where('user_id', $user->id)->exists();
+            return $onProject && $credential->hasAccessGrant($user->id);
         }
-        
-        // Viewers can see credentials but not edit
-        if ($user->role === 'viewer') {
-            return true;
-        }
-        
+
         return false;
     }
 
     /**
      * Determine whether the user can create models.
-     * Managers and developers can create credentials for their projects.
+     * Only admins and managers can create credentials.
      */
     public function create(User $user): bool
     {
-        return in_array($user->role, ['admin', 'manager', 'developer']);
+        return in_array($user->role, ['admin', 'manager']);
     }
 
     /**
      * Determine whether the user can update the model.
-     * Only project managers and assigned developers can update.
+     * Only project managers can update credentials.
      */
     public function update(User $user, Credential $credential): bool
     {
-        $project = $credential->project;
-        
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $credential->project->managers->contains('id', $user->id);
         }
-        
-        if ($user->role === 'developer') {
-            return $project->developers()->where('user_id', $user->id)->exists();
-        }
-        
+
         return false;
     }
 
@@ -86,12 +78,10 @@ class CredentialPolicy
      */
     public function delete(User $user, Credential $credential): bool
     {
-        $project = $credential->project;
-        
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $credential->project->managers->contains('id', $user->id);
         }
-        
+
         return false;
     }
 
@@ -113,21 +103,27 @@ class CredentialPolicy
 
     /**
      * Determine whether the user can create share links for this credential.
-     * Managers and developers for their assigned projects can share.
+     * Only managers can share credentials.
      */
     public function share(User $user, Credential $credential): bool
     {
-        $project = $credential->project;
-        
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $credential->project->managers->contains('id', $user->id);
         }
-        
-        if ($user->role === 'developer') {
-            return $project->developer_id === $user->id 
-                || $project->developers->contains($user->id);
+
+        return false;
+    }
+
+    /**
+     * Determine whether the user can manage access grants for this credential.
+     * Only managers on the project can grant/revoke developer access.
+     */
+    public function manageAccess(User $user, Credential $credential): bool
+    {
+        if ($user->role === 'manager') {
+            return $credential->project->managers->contains('id', $user->id);
         }
-        
+
         return false;
     }
 }

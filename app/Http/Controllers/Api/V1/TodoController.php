@@ -189,11 +189,16 @@ class TodoController extends Controller
     {
         Gate::authorize('update', $todo->project);
 
+        $user = $request->user();
+        $isDeveloper = $user->role === 'developer' && !$user->isAdmin();
+
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'sometimes|in:low,medium,high,critical',
-            'status' => 'sometimes|in:pending,in_progress,in_review,completed,cancelled',
+            'status' => $isDeveloper
+                ? 'sometimes|in:pending,in_progress,in_review'
+                : 'sometimes|in:pending,in_progress,in_review,completed,cancelled',
             'completed' => 'sometimes|boolean',
             'due_date' => 'nullable|date',
             'assignee_id' => 'nullable|exists:users,id',
@@ -207,10 +212,20 @@ class TodoController extends Controller
             'library_resource_ids.*' => 'exists:library_resources,id',
         ]);
 
+        // Developers cannot change assignee
+        if ($isDeveloper && isset($validated['assignee_id'])) {
+            unset($validated['assignee_id']);
+        }
+
         // Handle completed status
         if (isset($validated['completed'])) {
             $validated['status'] = $validated['completed'] ? 'completed' : 'pending';
             unset($validated['completed']);
+        }
+
+        // Prevent developers from using the `completed` boolean to bypass status restriction
+        if ($isDeveloper && isset($validated['status']) && $validated['status'] === 'completed') {
+            $validated['status'] = 'in_review';
         }
 
         // Handle legacy single file upload
