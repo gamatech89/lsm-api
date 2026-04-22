@@ -34,6 +34,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/share/{token}', [V1\CredentialShareController::class, 'show'])->name('share.show');
     Route::post('/share/{token}/access', [V1\CredentialShareController::class, 'access'])->name('share.access');
 
+    // SITE REVIEW PROXY (Public - used by iframe to load reviewed pages same-origin)
+    Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
+        ->middleware('throttle:60,1')
+        ->name('site-review-proxy');
+
     // SITE REVIEW SHARE (Public - password-protected at app level)
     Route::get('/review-share/{token}', [V1\SiteReviewController::class, 'showShare'])->name('review-share.show');
     Route::post('/review-share/{token}/access', [V1\SiteReviewController::class, 'accessShare'])->name('review-share.access');
