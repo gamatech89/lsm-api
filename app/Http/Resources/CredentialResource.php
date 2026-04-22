@@ -61,6 +61,12 @@ class CredentialResource extends JsonResource
             
             // Project reference (conditionally loaded)
             'project' => new ProjectResource($this->whenLoaded('project')),
+
+            // Access grants — users who have been explicitly granted access
+            'granted_user_ids' => $this->when(
+                $this->relationLoaded('accessGrants'),
+                fn() => $this->accessGrants->pluck('user_id')
+            ),
             
             // Timestamps
             'created_at' => $this->created_at->toISOString(),

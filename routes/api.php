@@ -219,6 +219,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/credentials/{credential}/share', [V1\CredentialShareController::class, 'store'])
             ->name('credentials.share');
 
+        // Access grants — who can see a credential (developer access control)
+        Route::get('/credentials/{credential}/access', [V1\CredentialAccessController::class, 'index'])
+            ->name('credentials.access.index');
+        Route::put('/credentials/{credential}/access', [V1\CredentialAccessController::class, 'sync'])
+            ->name('credentials.access.sync');
+
         // -------------------------------------------------
         // TODOS (nested under projects)
         // -------------------------------------------------

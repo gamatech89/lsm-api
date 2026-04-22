@@ -187,6 +187,7 @@ class ProjectController extends Controller
             'resources',
             'libraryResources',
             'todos.assignee:id,name,email',
+            'todos.attachments',
             'manager:id,name,email',
             'managers:id,name,email',
             'developer:id,name,email',
@@ -294,6 +295,7 @@ class ProjectController extends Controller
         $oldDeveloperIds = $project->developers->pluck('id')->toArray();
         $oldHealthStatus = $project->health_status;
         $oldSecurityStatus = $project->security_status;
+        $oldHealthCheckSecret = $project->health_check_secret;
 
         // Extract relationship arrays
         $tagIds = $validated['tag_ids'] ?? null;
@@ -349,7 +351,7 @@ class ProjectController extends Controller
             }
         }
 
-        // Dispatch WP account sync if team members changed
+        // Dispatch WP account sync if team members changed or plugin newly connected
         if ($project->health_check_secret) {
             // Force-reload relationships to get fresh data after sync() calls
             $project->load(['managers', 'developers']);
@@ -359,11 +361,18 @@ class ProjectController extends Controller
             $currentTeamIds = array_unique(array_merge($currentManagerIds, $currentDeveloperIds));
             $oldTeamIds = array_unique(array_merge($oldManagerIds, $oldDeveloperIds));
 
-            $addedUserIds = array_values(array_diff($currentTeamIds, $oldTeamIds));
-            $removedUserIds = array_values(array_diff($oldTeamIds, $currentTeamIds));
+            $pluginNewlyConnected = empty($oldHealthCheckSecret) && !empty($project->health_check_secret);
 
-            if (!empty($addedUserIds) || !empty($removedUserIds)) {
-                SyncWpAccountsJob::dispatch($project, $addedUserIds, $removedUserIds);
+            if ($pluginNewlyConnected && !empty($currentTeamIds)) {
+                // Full sync to provision all existing team members on newly connected plugin
+                SyncWpAccountsJob::dispatch($project, [], [], true);
+            } else {
+                $addedUserIds = array_values(array_diff($currentTeamIds, $oldTeamIds));
+                $removedUserIds = array_values(array_diff($oldTeamIds, $currentTeamIds));
+
+                if (!empty($addedUserIds) || !empty($removedUserIds)) {
+                    SyncWpAccountsJob::dispatch($project, $addedUserIds, $removedUserIds);
+                }
             }
         }
 

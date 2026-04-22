@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -64,6 +65,37 @@ class Credential extends Model
     public function shareLinks(): HasMany
     {
         return $this->hasMany(CredentialShareLink::class);
+    }
+
+    /**
+     * Get all explicit access grants for this credential.
+     */
+    public function accessGrants(): HasMany
+    {
+        return $this->hasMany(CredentialAccess::class);
+    }
+
+    /**
+     * Get the users who have been explicitly granted access.
+     */
+    public function grantedUsers(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            User::class,
+            CredentialAccess::class,
+            'credential_id',
+            'id',
+            'id',
+            'user_id'
+        );
+    }
+
+    /**
+     * Check if a developer has been explicitly granted access.
+     */
+    public function hasAccessGrant(int $userId): bool
+    {
+        return $this->accessGrants()->where('user_id', $userId)->exists();
     }
 
     /**
