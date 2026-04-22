@@ -259,6 +259,11 @@ class Project extends Model
         return $this->hasMany(SecurityScan::class)->orderBy('created_at', 'desc');
     }
 
+    public function siteReviews(): HasMany
+    {
+        return $this->hasMany(SiteReview::class);
+    }
+
 
     /**
      * Update the tracked time for this project.

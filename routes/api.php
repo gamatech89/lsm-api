@@ -34,6 +34,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/share/{token}', [V1\CredentialShareController::class, 'show'])->name('share.show');
     Route::post('/share/{token}/access', [V1\CredentialShareController::class, 'access'])->name('share.access');
 
+    // SITE REVIEW SHARE (Public - password-protected at app level)
+    Route::get('/review-share/{token}', [V1\SiteReviewController::class, 'showShare'])->name('review-share.show');
+    Route::post('/review-share/{token}/access', [V1\SiteReviewController::class, 'accessShare'])->name('review-share.access');
+    Route::post('/review-share/{token}/annotations', [V1\SiteReviewAnnotationController::class, 'storeShare'])->name('review-share.annotations.store');
+    Route::post('/review-share/{token}/annotations/{siteReviewAnnotation}/screenshot', [V1\SiteReviewAnnotationController::class, 'screenshotShare'])->name('review-share.annotations.screenshot');
+
     // WEBHOOKS (Public - authenticated via API key in payload)
     Route::post('/webhooks/support-ticket', [V1\SupportTicketController::class, 'receiveFromPlugin'])
         ->name('webhooks.support-ticket');
@@ -367,6 +373,36 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/notifications/{id}/read', [V1\NotificationController::class, 'markAsRead'])->name('notifications.read');
         Route::post('/notifications/read-all', [V1\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::get('/notifications/unread-count', [V1\NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+
+        // -------------------------------------------------
+        // SITE REVIEWS (visual feedback / annotation tool)
+        // -------------------------------------------------
+        Route::get('/projects/{project}/site-reviews', [V1\SiteReviewController::class, 'index'])
+            ->name('projects.site-reviews.index');
+        Route::post('/projects/{project}/site-reviews', [V1\SiteReviewController::class, 'store'])
+            ->name('projects.site-reviews.store');
+        Route::get('/site-reviews/{siteReview}', [V1\SiteReviewController::class, 'show'])
+            ->name('site-reviews.show');
+        Route::put('/site-reviews/{siteReview}', [V1\SiteReviewController::class, 'update'])
+            ->name('site-reviews.update');
+        Route::delete('/site-reviews/{siteReview}', [V1\SiteReviewController::class, 'destroy'])
+            ->name('site-reviews.destroy');
+        Route::post('/site-reviews/{siteReview}/share', [V1\SiteReviewController::class, 'generateShare'])
+            ->name('site-reviews.share.generate');
+        Route::delete('/site-reviews/{siteReview}/share', [V1\SiteReviewController::class, 'revokeShare'])
+            ->name('site-reviews.share.revoke');
+
+        // Annotations (authenticated)
+        Route::post('/site-reviews/{siteReview}/annotations', [V1\SiteReviewAnnotationController::class, 'store'])
+            ->name('site-reviews.annotations.store');
+        Route::put('/site-review-annotations/{siteReviewAnnotation}', [V1\SiteReviewAnnotationController::class, 'update'])
+            ->name('site-review-annotations.update');
+        Route::delete('/site-review-annotations/{siteReviewAnnotation}', [V1\SiteReviewAnnotationController::class, 'destroy'])
+            ->name('site-review-annotations.destroy');
+        Route::post('/site-review-annotations/{siteReviewAnnotation}/resolve', [V1\SiteReviewAnnotationController::class, 'resolve'])
+            ->name('site-review-annotations.resolve');
+        Route::post('/site-review-annotations/{siteReviewAnnotation}/screenshot', [V1\SiteReviewAnnotationController::class, 'screenshot'])
+            ->name('site-review-annotations.screenshot');
 
         // -------------------------------------------------
         // EXPORT
