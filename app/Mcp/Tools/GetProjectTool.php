@@ -97,7 +97,7 @@ class GetProjectTool extends Tool
             foreach ($credentials as $cred) {
                 $text .= "- {$cred->label}: {$cred->username} (ID: {$cred->id})\n";
             }
-            $text .= "\n*Use reveal-credential tool to view passwords.*\n";
+            $text .= "\n*Passwords are not accessible via MCP.*\n";
         }
 
         return Response::text($text);

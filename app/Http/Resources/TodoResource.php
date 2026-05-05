@@ -40,6 +40,15 @@ class TodoResource extends JsonResource
             // Linked library resources
             'library_resources' => LibraryResourceResource::collection($this->whenLoaded('libraryResources')),
 
+            // Linked project resources
+            'resources' => $this->whenLoaded('resources', fn() => $this->resources->map(fn($r) => [
+                'id' => $r->id,
+                'title' => $r->title,
+                'type' => $r->type,
+                'url' => $r->url,
+                'file_name' => $r->file_name,
+            ])),
+
             // Time estimate
             'estimated_minutes' => $this->estimated_minutes,
             

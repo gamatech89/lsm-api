@@ -16,7 +16,7 @@ class VaultResource extends Resource
 
     protected string $description = <<<'MARKDOWN'
         List of all credentials you have access to across projects.
-        Shows labels and usernames only - use the reveal tool to get passwords.
+        Shows labels and usernames only. Passwords are not accessible via MCP.
         Credentials are grouped by project.
     MARKDOWN;
 
@@ -58,7 +58,7 @@ class VaultResource extends Resource
             'total' => $credentials->count(),
             'projects' => $byProject->count(),
             'by_project' => $byProject,
-            'note' => 'Passwords are hidden. Use the reveal-credential tool with credential ID to view passwords.',
+            'note' => 'Passwords are not accessible via MCP.',
         ]);
     }
 }

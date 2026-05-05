@@ -56,7 +56,7 @@ class TodoController extends Controller
     {
         Gate::authorize('view', $project);
 
-        $query = $project->todos()->with(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
+        $query = $project->todos()->with(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments', 'resources:id,title,type,url,file_name']);
 
         // Filter by status
         if ($request->filled('status')) {
@@ -100,7 +100,7 @@ class TodoController extends Controller
     {
         Gate::authorize('view', $todo->project);
 
-        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments', 'resources:id,title,type,url,file_name']);
 
         return new TodoResource($todo);
     }
@@ -129,6 +129,8 @@ class TodoController extends Controller
             'estimated_minutes' => 'nullable|integer|min:0',
             'library_resource_ids' => 'nullable|array',
             'library_resource_ids.*' => 'exists:library_resources,id',
+            'resource_ids' => 'nullable|array',
+            'resource_ids.*' => 'exists:resources,id',
         ]);
 
         $validated['project_id'] = $project->id;
@@ -142,7 +144,7 @@ class TodoController extends Controller
             $validated['file_name'] = $file->getClientOriginalName();
         }
 
-        unset($validated['library_resource_ids'], $validated['files']);
+        unset($validated['library_resource_ids'], $validated['resource_ids'], $validated['files']);
 
         $todo = Todo::create($validated);
 
@@ -164,7 +166,12 @@ class TodoController extends Controller
             $todo->libraryResources()->sync($request->input('library_resource_ids', []));
         }
 
-        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
+        // Sync project resources if provided
+        if ($request->has('resource_ids')) {
+            $todo->resources()->sync($request->input('resource_ids', []));
+        }
+
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments', 'resources:id,title,type,url,file_name']);
 
         // Notify assignee if set
         if ($todo->assignee) {
@@ -210,6 +217,8 @@ class TodoController extends Controller
             'estimated_minutes' => 'nullable|integer|min:0',
             'library_resource_ids' => 'nullable|array',
             'library_resource_ids.*' => 'exists:library_resources,id',
+            'resource_ids' => 'nullable|array',
+            'resource_ids.*' => 'exists:resources,id',
         ]);
 
         // Developers cannot change assignee
@@ -252,7 +261,7 @@ class TodoController extends Controller
             }
         }
 
-        unset($validated['library_resource_ids'], $validated['files'], $validated['delete_attachment_ids']);
+        unset($validated['library_resource_ids'], $validated['resource_ids'], $validated['files'], $validated['delete_attachment_ids']);
         $todo->update($validated);
 
         // Handle multiple file attachments
@@ -273,13 +282,18 @@ class TodoController extends Controller
             $todo->libraryResources()->sync($request->input('library_resource_ids', []));
         }
 
+        // Sync project resources if provided
+        if ($request->has('resource_ids')) {
+            $todo->resources()->sync($request->input('resource_ids', []));
+        }
+
         // Notify if assignee changed and is set
         if ($todo->wasChanged('assignee_id') && $todo->assignee_id) {
             $todo->load(['project', 'assignee']); 
             $todo->assignee->notify(new \App\Notifications\TodoAssignedNotification($todo));
         }
 
-        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments']);
+        $todo->load(['assignee:id,name,email', 'libraryResources:id,title,type,url,file_name', 'attachments', 'resources:id,title,type,url,file_name']);
 
         return new TodoResource($todo);
     }

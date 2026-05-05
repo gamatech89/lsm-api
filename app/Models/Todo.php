@@ -60,6 +60,15 @@ class Todo extends Model
     }
 
     /**
+     * Get the project resources linked to this todo.
+     */
+    public function resources(): BelongsToMany
+    {
+        return $this->belongsToMany(Resource::class, 'todo_resource')
+            ->withTimestamps();
+    }
+
+    /**
      * Get the file attachments for this todo.
      */
     public function attachments(): HasMany

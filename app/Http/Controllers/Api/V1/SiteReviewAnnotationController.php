@@ -25,7 +25,7 @@ class SiteReviewAnnotationController extends Controller
             'parent_id'   => 'nullable|exists:site_review_annotations,id',
             'x_percent'   => 'required_without:parent_id|nullable|numeric|between:0,100',
             'y_percent'   => 'required_without:parent_id|nullable|numeric|between:0,100',
-            'scroll_y'    => 'nullable|integer|min:0',
+            'scroll_y'    => 'nullable|numeric|min:0',
             'comment'     => 'required|string|max:5000',
             'create_todo' => 'boolean',
         ]);
@@ -93,12 +93,64 @@ class SiteReviewAnnotationController extends Controller
         return $this->successResponse(new SiteReviewAnnotationResource($siteReviewAnnotation));
     }
 
+    public function createTodo(Request $request, SiteReviewAnnotation $siteReviewAnnotation): JsonResponse
+    {
+        Gate::authorize('view', $siteReviewAnnotation->review->project);
+
+        if ($siteReviewAnnotation->todo_id) {
+            return $this->errorResponse('A Todo already exists for this annotation.');
+        }
+
+        $validated = $request->validate([
+            'title'    => 'nullable|string|max:255',
+            'priority' => 'nullable|in:low,medium,high,critical',
+        ]);
+
+        $review = $siteReviewAnnotation->review;
+        $title  = $validated['title'] ?? mb_substr($siteReviewAnnotation->comment, 0, 80) . (mb_strlen($siteReviewAnnotation->comment) > 80 ? '...' : '');
+
+        $frontendUrl = env('FRONTEND_URL', config('app.url'));
+        $projectUrl = rtrim($frontendUrl, '/') . '/projects/' . $review->project_id;
+        
+        $todo = Todo::create([
+            'project_id'  => $review->project_id,
+            'title'       => $title,
+            'description' => $siteReviewAnnotation->comment . "\n\n--- Resource Links ---\n" . $projectUrl,
+            'status'      => 'pending',
+            'priority'    => $validated['priority'] ?? 'medium',
+        ]);
+
+        // Attach screenshot if provided
+        if ($request->hasFile('screenshot')) {
+            $path = $request->file('screenshot')->store(
+                'site-reviews/' . $review->id . '/todos',
+                'public'
+            );
+            \App\Models\TodoAttachment::create([
+                'todo_id'       => $todo->id,
+                'file_path'     => $path,
+                'file_name'     => 'review-screenshot.png',
+                'file_size'     => $request->file('screenshot')->getSize(),
+                'mime_type'     => 'image/png',
+                'uploaded_by'   => $request->user()->id,
+            ]);
+            $siteReviewAnnotation->update(['screenshot_path' => $path]);
+        }
+
+        $siteReviewAnnotation->update(['todo_id' => $todo->id]);
+
+        return $this->createdResponse([
+            'todo_id' => $todo->id,
+            'todo_title' => $todo->title,
+        ], 'Todo created.');
+    }
+
     public function screenshot(Request $request, SiteReviewAnnotation $siteReviewAnnotation): JsonResponse
     {
         Gate::authorize('view', $siteReviewAnnotation->review->project);
 
         $request->validate([
-            'screenshot' => 'required|image|max:5120',
+            'screenshot' => 'required|image|max:20480',
         ]);
 
         if ($siteReviewAnnotation->screenshot_path) {
@@ -111,6 +163,18 @@ class SiteReviewAnnotationController extends Controller
         );
 
         $siteReviewAnnotation->update(['screenshot_path' => $path]);
+
+        // If a Todo is associated with this annotation, attach the screenshot to the Todo as well
+        if ($siteReviewAnnotation->todo_id) {
+            \App\Models\TodoAttachment::create([
+                'todo_id'       => $siteReviewAnnotation->todo_id,
+                'file_path'     => $path,
+                'file_name'     => 'review-screenshot.png',
+                'file_size'     => $request->file('screenshot')->getSize(),
+                'mime_type'     => 'image/png',
+                'uploaded_by'   => $request->user() ? $request->user()->id : null,
+            ]);
+        }
 
         return $this->successResponse([
             'screenshot_url' => asset('storage/' . $path),
@@ -137,7 +201,7 @@ class SiteReviewAnnotationController extends Controller
             'parent_id'    => 'nullable|exists:site_review_annotations,id',
             'x_percent'    => 'required_without:parent_id|nullable|numeric|between:0,100',
             'y_percent'    => 'required_without:parent_id|nullable|numeric|between:0,100',
-            'scroll_y'     => 'nullable|integer|min:0',
+            'scroll_y'     => 'nullable|numeric|min:0',
             'comment'      => 'required|string|max:5000',
             'author_name'  => 'required|string|max:100',
             'author_email' => 'nullable|email|max:255',
@@ -172,7 +236,7 @@ class SiteReviewAnnotationController extends Controller
         }
 
         $request->validate([
-            'screenshot' => 'required|image|max:5120',
+            'screenshot' => 'required|image|max:20480',
         ]);
 
         if ($siteReviewAnnotation->screenshot_path) {
@@ -185,6 +249,18 @@ class SiteReviewAnnotationController extends Controller
         );
 
         $siteReviewAnnotation->update(['screenshot_path' => $path]);
+
+        // If a Todo is associated with this annotation, attach the screenshot to the Todo as well
+        if ($siteReviewAnnotation->todo_id) {
+            \App\Models\TodoAttachment::create([
+                'todo_id'       => $siteReviewAnnotation->todo_id,
+                'file_path'     => $path,
+                'file_name'     => 'review-screenshot.png',
+                'file_size'     => $request->file('screenshot')->getSize(),
+                'mime_type'     => 'image/png',
+                'uploaded_by'   => null, // public shares have no logged-in user
+            ]);
+        }
 
         return $this->successResponse([
             'screenshot_url' => asset('storage/' . $path),
@@ -202,10 +278,13 @@ class SiteReviewAnnotationController extends Controller
             $title .= '...';
         }
 
+        $frontendUrl = env('FRONTEND_URL', config('app.url'));
+        $projectUrl = rtrim($frontendUrl, '/') . '/projects/' . $review->project_id;
+        
         return Todo::create([
             'project_id'  => $review->project_id,
             'title'       => $title,
-            'description' => $annotation->comment . "\n\n🔗 Review: " . $review->title . " — " . $review->url,
+            'description' => $annotation->comment . "\n\n--- Resource Links ---\n" . $projectUrl,
             'status'      => 'pending',
             'priority'    => 'medium',
         ]);
