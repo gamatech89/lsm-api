@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('site_reviews', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('created_by')->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('title');
             $table->string('url');
             $table->enum('status', ['draft', 'active', 'archived'])->default('active');
