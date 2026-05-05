@@ -31,6 +31,8 @@ class UserResource extends JsonResource
             'billing_address' => $this->billing_address,
             'billing_tax_id' => $this->billing_tax_id,
             'invoice_prefix' => $this->invoice_prefix,
+            'two_factor_enabled' => (bool) $this->two_factor_confirmed_at,
+            'two_factor_email_enabled' => (bool) $this->two_factor_email_enabled,
             'email_verified_at' => $this->email_verified_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

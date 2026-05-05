@@ -6,11 +6,12 @@ use App\Http\Requests\Api\LoginRequest;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 use App\Models\User;
+use App\Notifications\TwoFactorCodeNotification;
 
 /**
  * Authentication Controller
@@ -32,6 +33,33 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return $this->errorResponse('Invalid credentials', 401);
+        }
+
+        if ($user->two_factor_confirmed_at) {
+            $pendingToken = Str::random(64);
+            Cache::put("2fa_pending:{$pendingToken}", $user->id, now()->addMinutes(10));
+
+            return $this->successResponse([
+                'two_factor_required' => true,
+                'two_factor_token' => $pendingToken,
+                'method' => 'totp',
+            ]);
+        }
+
+        if ($user->two_factor_email_enabled) {
+            $pendingToken = Str::random(64);
+            Cache::put("2fa_pending:{$pendingToken}", $user->id, now()->addMinutes(10));
+
+            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            Cache::put("2fa_email_code:{$pendingToken}", $code, now()->addMinutes(10));
+
+            $user->notify(new TwoFactorCodeNotification($code));
+
+            return $this->successResponse([
+                'two_factor_required' => true,
+                'two_factor_token' => $pendingToken,
+                'method' => 'email',
+            ]);
         }
 
         // Create a new token for the device
