@@ -9,6 +9,7 @@ use App\Models\CredentialShareLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Gate;
 
@@ -98,9 +99,10 @@ class CredentialShareController extends Controller
             ], 404);
         }
 
-        // Check password if set
+        // Check password if set. access_password is stored bcrypt-hashed
+        // (see CredentialShareLink cast), so it must be verified with Hash::check.
         if (!empty($link->access_password)) {
-            if ($request->input('password') !== $link->access_password) {
+            if (!Hash::check((string) $request->input('password'), $link->access_password)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Incorrect password.'
