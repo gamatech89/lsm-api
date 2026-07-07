@@ -49,6 +49,25 @@ class EphemeralSecretController extends Controller
         ]);
     }
 
+    public function show(string $token): JsonResponse
+    {
+        $secret = EphemeralSecret::where('token', $token)->first();
+
+        if (! $secret || ! $secret->isAvailable()) {
+            return response()->json([
+                'available' => false,
+                'reason' => $this->unavailableReason($secret),
+            ], 404);
+        }
+
+        return response()->json([
+            'available' => true,
+            'title' => $secret->title,
+            'has_password' => ! empty($secret->access_password),
+            'expires_at' => $secret->expires_at,
+        ]);
+    }
+
     protected function unavailableReason(?EphemeralSecret $secret): string
     {
         if (! $secret) {

@@ -47,6 +47,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->middleware('throttle:10,1')
         ->name('share.access');
 
+    // Ephemeral secret reveal (public, throttled)
+    Route::get('/s/{token}', [V1\EphemeralSecretController::class, 'show'])
+        ->middleware('throttle:20,1')
+        ->name('ephemeral-secrets.show');
+
     // SITE REVIEW PROXY (auth required - iframe src sends session cookie)
     Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
         ->middleware(['auth:sanctum', 'throttle:60,1'])
