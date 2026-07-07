@@ -47,17 +47,10 @@ class BackupController extends Controller
     /**
      * Get a single backup.
      */
-    public function show(Project $project, Backup $backup): JsonResponse
+    public function show(Backup $backup): JsonResponse
     {
-        Gate::authorize('view', $project);
-        
-        // Ensure backup belongs to project
-        if ($backup->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Backup not found',
-            ], 404);
-        }
+        // Shallow route — the project is derived from the backup.
+        Gate::authorize('view', $backup->project);
 
         $backup->load('creator:id,name');
 
@@ -113,17 +106,10 @@ class BackupController extends Controller
     /**
      * Delete a backup.
      */
-    public function destroy(Project $project, Backup $backup): JsonResponse
+    public function destroy(Backup $backup): JsonResponse
     {
-        Gate::authorize('update', $project);
-        
-        // Ensure backup belongs to project
-        if ($backup->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Backup not found',
-            ], 404);
-        }
+        // Shallow route — the project is derived from the backup.
+        Gate::authorize('update', $backup->project);
 
         // Delete the backup file using the storage service
         if ($backup->file_path) {
@@ -144,17 +130,11 @@ class BackupController extends Controller
      * For cloud storage (S3, GCS), returns a temporary signed URL.
      * For local storage, streams the file directly.
      */
-    public function download(Project $project, Backup $backup)
+    public function download(Backup $backup)
     {
+        // Shallow route — the project is derived from the backup.
+        $project = $backup->project;
         Gate::authorize('view', $project);
-        
-        // Ensure backup belongs to project
-        if ($backup->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Backup not found',
-            ], 404);
-        }
 
         if (!$backup->isCompleted()) {
             return response()->json([
@@ -203,17 +183,10 @@ class BackupController extends Controller
     /**
      * Restore a backup.
      */
-    public function restore(Project $project, Backup $backup): JsonResponse
+    public function restore(Backup $backup): JsonResponse
     {
-        Gate::authorize('update', $project);
-        
-        // Ensure backup belongs to project
-        if ($backup->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Backup not found',
-            ], 404);
-        }
+        // Shallow route — the project is derived from the backup.
+        Gate::authorize('update', $backup->project);
 
         if (!$backup->isCompleted()) {
             return response()->json([
