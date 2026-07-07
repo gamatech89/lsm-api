@@ -63,14 +63,26 @@ class SupportTicketController extends Controller
      */
     public function indexAll(Request $request)
     {
-        // Check if user has global permission (assuming admin or manager)
-        // For now, we allow authenticated users to see tickets they have access to
-        // Or strictly restrict to proper roles.
-        // Assuming Gate::authorize('viewAny', SupportTicket::class) or similar?
-        // Let's assume basic auth for now as per controller context, 
-        // but ideally we filter by projects user can see.
-        
+        $user = $request->user();
+
         $query = SupportTicket::with(['project', 'todo:id,title,status']);
+
+        // Scope to projects the user is allowed to see. Admins see everything;
+        // managers and developers only see tickets on their assigned projects.
+        if (!$user->isAdmin()) {
+            $query->whereHas('project', function ($q) use ($user) {
+                if ($user->role === 'manager') {
+                    $q->where('manager_id', $user->id)
+                        ->orWhereHas('managers', fn($m) => $m->where('users.id', $user->id));
+                } elseif ($user->role === 'developer') {
+                    $q->where('developer_id', $user->id)
+                        ->orWhereHas('developers', fn($d) => $d->where('users.id', $user->id));
+                } else {
+                    // Unknown role: see nothing.
+                    $q->whereRaw('1 = 0');
+                }
+            });
+        }
 
         // Filter by status
         if ($request->filled('status')) {
