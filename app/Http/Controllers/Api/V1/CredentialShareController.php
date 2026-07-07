@@ -25,9 +25,9 @@ class CredentialShareController extends Controller
         Gate::authorize('manageCredentials', $credential->project);
 
         $validated = $request->validate([
-            'expires_in_minutes' => 'required|integer|min:5|max:10080', // Max 1 week
+            'expires_in_minutes' => 'required|integer|min:5|max:1440', // Max 24 hours
             'max_views' => 'required|integer|min:1|max:50',
-            'access_password' => 'nullable|string|min:4',
+            'access_password' => 'required|string|min:8', // Password protection is mandatory
             'recipient_email' => 'nullable|email',
             'note' => 'nullable|string|max:500',
         ]);
