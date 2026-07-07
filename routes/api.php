@@ -49,7 +49,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
     // SITE REVIEW PROXY (Public - used by iframe to load reviewed pages same-origin)
     Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
-        ->middleware('throttle:60,1')
+        ->middleware(['auth:sanctum', 'throttle:60,1'])
         ->name('site-review-proxy');
 
     // SITE REVIEW SHARE (Public - password-protected at app level) — throttled
