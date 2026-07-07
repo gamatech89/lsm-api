@@ -417,13 +417,18 @@ class ProjectController extends Controller
             $baseUrl = rtrim($project->url, '/');
             $hasPlugin = !empty($project->health_check_secret);
 
-            // Two-tier: plugin health endpoint if connected, otherwise simple URL check
-            $checkUrl = $hasPlugin
-                ? "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}"
-                : $baseUrl;
-            
+            // Two-tier: plugin health endpoint if connected, otherwise simple URL check.
+            // Authenticate via header so the secret never appears in the request URL.
+            $request = Http::timeout(15);
+            if ($hasPlugin) {
+                $checkUrl = "{$baseUrl}/wp-json/lsm/v1/health";
+                $request = $request->withHeaders(['X-LSM-Key' => $project->health_check_secret]);
+            } else {
+                $checkUrl = $baseUrl;
+            }
+
             $startTime = microtime(true);
-            $response = Http::timeout(15)->get($checkUrl);
+            $response = $request->get($checkUrl);
             $responseTime = round((microtime(true) - $startTime) * 1000);
             
             if ($response->successful()) {

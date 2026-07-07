@@ -507,7 +507,7 @@ class LsmService
         if (!$this->isConfigured()) return null;
 
         try {
-            $url = $this->baseUrl . '/security/scan?key=' . $this->apiKey;
+            $url = $this->baseUrl . '/security/scan';
             $data = ['scan_type' => $scanType];
             if ($modules) {
                 $data['modules'] = implode(',', $modules);
@@ -517,6 +517,7 @@ class LsmService
             $timeout = $timeouts[$scanType] ?? 180;
 
             $response = Http::timeout($timeout)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
                 ->asJson()
                 ->post($url, $data);
@@ -536,11 +537,10 @@ class LsmService
         if (!$this->isConfigured()) return null;
 
         try {
-            $params = ['key' => $this->apiKey];
-
             $response = Http::timeout(90)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
-                ->get($this->baseUrl . '/security/scan/quick', $params);
+                ->get($this->baseUrl . '/security/scan/quick');
 
             return $this->handleResponse($response);
         } catch (\Exception $e) {
@@ -558,11 +558,10 @@ class LsmService
         if (!$this->isConfigured()) return null;
 
         try {
-            $params = ['key' => $this->apiKey];
-
             $response = Http::timeout(5)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
-                ->get($this->baseUrl . '/security/scan/progress', $params);
+                ->get($this->baseUrl . '/security/scan/progress');
 
             $json = $response->json();
             return $json ?? null;
@@ -585,11 +584,10 @@ class LsmService
         if (!$this->isConfigured()) return null;
 
         try {
-            $params = ['key' => $this->apiKey];
-
             $response = Http::timeout(120)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
-                ->get($this->baseUrl . '/media/unused', $params);
+                ->get($this->baseUrl . '/media/unused');
 
             return $this->handleResponse($response);
         } catch (\Exception $e) {
@@ -636,10 +634,8 @@ class LsmService
         if (!$this->isConfigured()) return null;
 
         try {
-            // Add key to params
-            $params['key'] = $this->apiKey;
-            
             $response = Http::timeout(self::DEFAULT_TIMEOUT)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
                 ->get($this->baseUrl . $endpoint, $params);
 
@@ -655,13 +651,12 @@ class LsmService
         if (!$this->isConfigured()) return null;
 
         try {
-            // Add key via query param for authentication (LSM supports it)
-            $url = $this->baseUrl . $endpoint . '?key=' . $this->apiKey;
-            
+            // Authenticate via header — keeps the secret out of URLs and access logs.
             $response = Http::timeout($timeout ?? self::DEFAULT_TIMEOUT)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
                 ->asJson() // Ensure JSON content type
-                ->post($url, $data);
+                ->post($this->baseUrl . $endpoint, $data);
 
             return $this->handleResponse($response);
         } catch (\Exception $e) {
