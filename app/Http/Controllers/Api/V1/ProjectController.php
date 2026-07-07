@@ -39,6 +39,8 @@ class ProjectController extends Controller
         $user = $request->user();
         
         $query = Project::query()
+            ->select('projects.*')
+            ->addSelect(['highest_todo_priority_rank' => Project::highestTodoPriorityRankSubquery()])
             ->with(['manager:id,name,email', 'managers:id,name,email', 'developer:id,name,email', 'developers:id,name,email', 'tags'])
             ->withCount(['todos', 'credentials', 'resources', 'maintenanceReports'])
             ->withCount(['todos as pending_todos_count' => fn($q) => $q->where('status', '!=', 'completed')]);

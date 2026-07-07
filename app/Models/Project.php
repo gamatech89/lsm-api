@@ -57,7 +57,7 @@ class Project extends Model
     /**
      * Never expose the lookup hash in serialized output.
      */
-    protected $hidden = ['health_check_secret_hash'];
+    protected $hidden = ['health_check_secret_hash', 'highest_todo_priority_rank'];
 
     protected function casts(): array
     {
@@ -80,6 +80,13 @@ class Project extends Model
      */
     public function getHighestTodoPriorityAttribute(): ?string
     {
+        // Fast path: use the rank precomputed by a list query's subselect
+        // (see ProjectController::index) to avoid an N+1 todos load per row.
+        if (array_key_exists('highest_todo_priority_rank', $this->attributes)) {
+            $rank = (int) $this->attributes['highest_todo_priority_rank'];
+            return [4 => 'urgent', 3 => 'high', 2 => 'medium', 1 => 'low'][$rank] ?? null;
+        }
+
         $priorities = ['low', 'medium', 'high', 'urgent'];
         $priorityOrder = array_flip($priorities);
 
@@ -95,6 +102,18 @@ class Project extends Model
         }
 
         return $highestPriority;
+    }
+
+    /**
+     * Correlated subselect that ranks a project's highest todo priority
+     * (4=urgent … 1=low) in a single query, for list endpoints.
+     */
+    public static function highestTodoPriorityRankSubquery(): \Illuminate\Database\Query\Builder
+    {
+        return Todo::query()
+            ->selectRaw("MAX(CASE priority WHEN 'urgent' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END)")
+            ->whereColumn('todos.project_id', 'projects.id')
+            ->getQuery();
     }
 
     /**
