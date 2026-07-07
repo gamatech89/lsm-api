@@ -52,17 +52,10 @@ class PhpErrorController extends Controller
     /**
      * Get a single PHP error.
      */
-    public function show(Project $project, PhpError $phpError): JsonResponse
+    public function show(PhpError $phpError): JsonResponse
     {
-        Gate::authorize('view', $project);
-        
-        // Ensure error belongs to project
-        if ($phpError->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error not found',
-            ], 404);
-        }
+        // Shallow route — the project is derived from the error.
+        Gate::authorize('view', $phpError->project);
 
         return response()->json([
             'success' => true,
@@ -120,17 +113,10 @@ class PhpErrorController extends Controller
     /**
      * Mark an error as resolved.
      */
-    public function resolve(Project $project, PhpError $phpError): JsonResponse
+    public function resolve(PhpError $phpError): JsonResponse
     {
-        Gate::authorize('update', $project);
-        
-        // Ensure error belongs to project
-        if ($phpError->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error not found',
-            ], 404);
-        }
+        // Shallow route — the project is derived from the error.
+        Gate::authorize('update', $phpError->project);
 
         $phpError->markResolved(auth()->id());
 
@@ -144,17 +130,10 @@ class PhpErrorController extends Controller
     /**
      * Delete a specific error.
      */
-    public function destroy(Project $project, PhpError $phpError): JsonResponse
+    public function destroy(PhpError $phpError): JsonResponse
     {
-        Gate::authorize('update', $project);
-        
-        // Ensure error belongs to project
-        if ($phpError->project_id !== $project->id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error not found',
-            ], 404);
-        }
+        // Shallow route — the project is derived from the error.
+        Gate::authorize('update', $phpError->project);
 
         $phpError->delete();
 
