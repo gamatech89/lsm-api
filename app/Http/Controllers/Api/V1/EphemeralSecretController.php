@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\EphemeralSecret;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class EphemeralSecretController extends Controller
@@ -65,6 +67,49 @@ class EphemeralSecretController extends Controller
             'title' => $secret->title,
             'has_password' => ! empty($secret->access_password),
             'expires_at' => $secret->expires_at,
+        ]);
+    }
+
+    public function access(Request $request, string $token): JsonResponse
+    {
+        $data = null;
+
+        $result = DB::transaction(function () use ($request, $token, &$data) {
+            $secret = EphemeralSecret::where('token', $token)->lockForUpdate()->first();
+
+            if (! $secret || ! $secret->isAvailable()) {
+                return ['reason' => $this->unavailableReason($secret)];
+            }
+
+            if (! empty($secret->access_password)
+                && ! Hash::check((string) $request->input('password'), $secret->access_password)) {
+                return ['password_error' => true];
+            }
+
+            $data = $secret->payload;                 // decrypted array
+            $secret->payload = null;                  // burn
+            $secret->viewed_at = now();
+            $secret->last_viewed_ip = $request->ip();
+            $secret->save();
+
+            return ['secret' => $secret];
+        });
+
+        if (! empty($result['password_error'])) {
+            return response()->json(['available' => true, 'message' => 'Incorrect password.'], 403);
+        }
+
+        if (empty($result['secret'])) {
+            return response()->json(['available' => false, 'reason' => $result['reason']], 404);
+        }
+
+        activity()->performedOn($result['secret'])
+            ->withProperties(['ip' => $request->ip()])
+            ->log('revealed ephemeral secret');
+
+        return response()->json([
+            'data' => array_merge(['title' => $result['secret']->title], $data),
+            'revealed_once' => true,
         ]);
     }
 

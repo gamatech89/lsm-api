@@ -51,6 +51,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/s/{token}', [V1\EphemeralSecretController::class, 'show'])
         ->middleware('throttle:20,1')
         ->name('ephemeral-secrets.show');
+    Route::post('/s/{token}/access', [V1\EphemeralSecretController::class, 'access'])
+        ->middleware('throttle:10,1')
+        ->name('ephemeral-secrets.access');
 
     // SITE REVIEW PROXY (auth required - iframe src sends session cookie)
     Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
