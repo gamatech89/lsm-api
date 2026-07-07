@@ -75,7 +75,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // PROTECTED ROUTES (Requires Sanctum authentication)
     // =====================================================
     
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureTwoFactorEnrolled::class])->group(function () {
         
         // -------------------------------------------------
         // AUTHENTICATION

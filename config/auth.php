@@ -112,4 +112,20 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | MFA Enforced Roles
+    |--------------------------------------------------------------------------
+    |
+    | Roles that must set up two-factor authentication before they can use the
+    | app (a force-enrollment gate). Comma-separated. Defaults to admins first;
+    | extend to 'admin,manager,developer' to enforce for everyone.
+    |
+    */
+
+    'mfa_enforced_roles' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MFA_ENFORCED_ROLES', 'admin'))
+    ))),
+
 ];

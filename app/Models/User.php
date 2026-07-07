@@ -88,6 +88,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether this user is required to set up 2FA before they can proceed.
+     * Enforced roles are configurable (config('auth.mfa_enforced_roles')),
+     * defaulting to admins. Either TOTP or email 2FA counts as enrolled.
+     */
+    public function mustEnrollTwoFactor(): bool
+    {
+        $enforcedRoles = config('auth.mfa_enforced_roles', ['admin']);
+
+        if (! in_array($this->role, $enforcedRoles, true)) {
+            return false;
+        }
+
+        return $this->two_factor_confirmed_at === null && ! $this->two_factor_email_enabled;
+    }
+
+    /**
      * Check if user is a manager.
      */
     public function isManager(): bool
