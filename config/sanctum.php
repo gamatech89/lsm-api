@@ -47,7 +47,7 @@ return [
     |
     */
 
-    'expiration' => null,
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 480), // 8 hours; clients refresh before expiry
 
     /*
     |--------------------------------------------------------------------------
