@@ -26,22 +26,39 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::post('/reset-password', [V1\AuthController::class, 'resetPassword'])
         ->middleware('throttle:5,1')
         ->name('password.reset');
-    
+
+    // Two-factor challenge completion (public — authenticated via the short-lived
+    // pending token issued by /login). Throttled to prevent code brute-forcing.
+    Route::post('/two-factor/verify', [V1\TwoFactorController::class, 'verify'])
+        ->middleware('throttle:6,1')
+        ->name('two-factor.verify');
+    Route::post('/two-factor/email/send', [V1\TwoFactorController::class, 'sendEmailCode'])
+        ->middleware('throttle:6,1')
+        ->name('two-factor.email.send');
+
     // Public credential share verification (if needed for mobile)
     // Route::post('/share/credential/{token}/verify', [V1\CredentialShareController::class, 'verify']);
     
-    // VAULT SHARING (Public Access)
-    Route::get('/share/{token}', [V1\CredentialShareController::class, 'show'])->name('share.show');
-    Route::post('/share/{token}/access', [V1\CredentialShareController::class, 'access'])->name('share.access');
+    // VAULT SHARING (Public Access) — throttled to prevent token/password brute-forcing
+    Route::get('/share/{token}', [V1\CredentialShareController::class, 'show'])
+        ->middleware('throttle:20,1')
+        ->name('share.show');
+    Route::post('/share/{token}/access', [V1\CredentialShareController::class, 'access'])
+        ->middleware('throttle:10,1')
+        ->name('share.access');
 
     // SITE REVIEW PROXY (Public - used by iframe to load reviewed pages same-origin)
     Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
         ->middleware('throttle:60,1')
         ->name('site-review-proxy');
 
-    // SITE REVIEW SHARE (Public - password-protected at app level)
-    Route::get('/review-share/{token}', [V1\SiteReviewController::class, 'showShare'])->name('review-share.show');
-    Route::post('/review-share/{token}/access', [V1\SiteReviewController::class, 'accessShare'])->name('review-share.access');
+    // SITE REVIEW SHARE (Public - password-protected at app level) — throttled
+    Route::get('/review-share/{token}', [V1\SiteReviewController::class, 'showShare'])
+        ->middleware('throttle:20,1')
+        ->name('review-share.show');
+    Route::post('/review-share/{token}/access', [V1\SiteReviewController::class, 'accessShare'])
+        ->middleware('throttle:10,1')
+        ->name('review-share.access');
     Route::post('/review-share/{token}/annotations', [V1\SiteReviewAnnotationController::class, 'storeShare'])->name('review-share.annotations.store');
     Route::post('/review-share/{token}/annotations/{siteReviewAnnotation}/screenshot', [V1\SiteReviewAnnotationController::class, 'screenshotShare'])->name('review-share.annotations.screenshot');
 
@@ -69,6 +86,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::put('/user/profile', [V1\AuthController::class, 'updateProfile'])->name('user.update-profile');
         Route::put('/user/billing', [V1\AuthController::class, 'updateBilling'])->name('user.update-billing');
         Route::post('/refresh-token', [V1\AuthController::class, 'refresh'])->name('refresh');
+
+        // Two-factor management (authenticated — the user configures their own 2FA)
+        Route::prefix('two-factor')->name('two-factor.')->group(function () {
+            Route::post('/enable', [V1\TwoFactorController::class, 'enable'])->name('enable');
+            Route::post('/confirm', [V1\TwoFactorController::class, 'confirm'])->name('confirm');
+            Route::post('/disable', [V1\TwoFactorController::class, 'disable'])->name('disable');
+            Route::post('/recovery-codes', [V1\TwoFactorController::class, 'regenerateRecoveryCodes'])->name('recovery-codes');
+            Route::post('/email/enable', [V1\TwoFactorController::class, 'enableEmail'])->name('email.enable');
+            Route::post('/email/disable', [V1\TwoFactorController::class, 'disableEmail'])->name('email.disable');
+        });
 
         // -------------------------------------------------
         // DASHBOARD
