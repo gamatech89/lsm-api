@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedString;
 use App\Http\Controllers\Api\V1\DashboardController;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -53,9 +54,15 @@ class Project extends Model
 
     protected $appends = ['highest_todo_priority'];
 
+    /**
+     * Never expose the lookup hash in serialized output.
+     */
+    protected $hidden = ['health_check_secret_hash'];
+
     protected function casts(): array
     {
         return [
+            'health_check_secret' => EncryptedString::class,
             'last_health_check_at' => 'datetime',
             'ssl_expires_at' => 'date',
             'domain_expires_at' => 'date',
@@ -95,6 +102,16 @@ class Project extends Model
      */
     protected static function booted(): void
     {
+        // Keep the deterministic lookup hash in sync with the (encrypted) secret.
+        static::saving(function (Project $project) {
+            if ($project->isDirty('health_check_secret')) {
+                $secret = $project->health_check_secret; // decrypted via cast
+                $project->health_check_secret_hash = ($secret !== null && $secret !== '')
+                    ? hash('sha256', $secret)
+                    : null;
+            }
+        });
+
         static::saved(function (Project $project) {
             if ($project->isDirty(['health_status', 'security_status'])) {
                 DashboardController::clearCache();

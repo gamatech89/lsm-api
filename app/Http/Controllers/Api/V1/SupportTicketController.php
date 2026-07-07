@@ -250,9 +250,11 @@ class SupportTicketController extends Controller
                 'problem_page' => 'nullable|string|max:500',
             ]);
 
-            // Find project by site URL and API key
+            // Find project by site URL and API key. The secret is encrypted at
+            // rest, so match on its deterministic hash rather than the value.
             $siteUrl = rtrim($validated['site_url'], '/');
-            $project = Project::where('health_check_secret', $validated['api_key'])
+            $apiKeyHash = hash('sha256', $validated['api_key']);
+            $project = Project::where('health_check_secret_hash', $apiKeyHash)
                 ->where(function ($query) use ($siteUrl) {
                     // Match URL with or without trailing slash, http or https
                     $query->where('url', $siteUrl)
@@ -267,7 +269,7 @@ class SupportTicketController extends Controller
                 $parsedUrl = parse_url($siteUrl);
                 $domain = $parsedUrl['host'] ?? '';
                 
-                $project = Project::where('health_check_secret', $validated['api_key'])
+                $project = Project::where('health_check_secret_hash', $apiKeyHash)
                     ->where(function ($query) use ($domain) {
                         $query->where('domain', $domain)
                             ->orWhere('domain', 'www.' . $domain)
