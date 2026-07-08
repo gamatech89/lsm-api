@@ -47,7 +47,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->middleware('throttle:10,1')
         ->name('share.access');
 
-    // SITE REVIEW PROXY (Public - used by iframe to load reviewed pages same-origin)
+    // Ephemeral secret reveal (public, throttled)
+    Route::get('/s/{token}', [V1\EphemeralSecretController::class, 'show'])
+        ->middleware('throttle:20,1')
+        ->name('ephemeral-secrets.show');
+    Route::post('/s/{token}/access', [V1\EphemeralSecretController::class, 'access'])
+        ->middleware('throttle:10,1')
+        ->name('ephemeral-secrets.access');
+
+    // SITE REVIEW PROXY (auth required - iframe src sends session cookie)
     Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
         ->middleware(['auth:sanctum', 'throttle:60,1'])
         ->name('site-review-proxy');
@@ -96,6 +104,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/email/enable', [V1\TwoFactorController::class, 'enableEmail'])->name('email.enable');
             Route::post('/email/disable', [V1\TwoFactorController::class, 'disableEmail'])->name('email.disable');
         });
+
+        // Ephemeral secret send (any authenticated role)
+        Route::post('/ephemeral-secrets', [V1\EphemeralSecretController::class, 'store'])
+            ->name('ephemeral-secrets.store');
 
         // -------------------------------------------------
         // DASHBOARD

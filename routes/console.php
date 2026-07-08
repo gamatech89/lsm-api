@@ -187,3 +187,18 @@ Schedule::command('todos:send-due-reminders')
     ->withoutOverlapping()
     ->name('todo-due-reminders')
     ->onOneServer();
+
+/*
+|--------------------------------------------------------------------------
+| Ephemeral Secret Purge
+|--------------------------------------------------------------------------
+|
+| Deletes expired and already-viewed ephemeral-secret tombstones once they
+| are past the 7-day retention window.
+|
+*/
+
+Schedule::command('ephemeral-secrets:purge')
+    ->daily()
+    ->onOneServer()
+    ->name('ephemeral-secrets-purge');
