@@ -15,6 +15,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Encrypted ciphertext is far longer than the original ~32-char key and
+        // overflows the legacy VARCHAR(255). Widen to TEXT first. MySQL only —
+        // SQLite has no string-length limit, so its string column already fits.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE `projects` MODIFY `health_check_secret` TEXT NULL');
+        }
+
         DB::table('projects')
             ->whereNotNull('health_check_secret')
             ->where('health_check_secret', '!=', '')
