@@ -128,18 +128,23 @@ class TwoFactorController extends Controller
 
         $user = User::find($userId);
 
-        if (!$user || !$user->two_factor_confirmed_at) {
+        // Reject only if the user has no 2FA method at all. Email-only users
+        // have two_factor_email_enabled set but two_factor_confirmed_at null.
+        if (!$user || (!$user->two_factor_confirmed_at && !$user->two_factor_email_enabled)) {
             Cache::forget($cacheKey);
             return $this->errorResponse('Invalid session', 401);
         }
 
-        $valid = $this->google2fa->verifyKey($user->two_factor_secret, $request->code);
+        $valid = false;
 
-        if (!$valid) {
-            $valid = $this->checkAndConsumeRecoveryCode($user, $request->code);
+        // Authenticator app (TOTP) or recovery code — only when a secret is set.
+        if ($user->two_factor_secret) {
+            $valid = $this->google2fa->verifyKey($user->two_factor_secret, $request->code)
+                || $this->checkAndConsumeRecoveryCode($user, $request->code);
         }
 
-        if (!$valid) {
+        // Emailed one-time code.
+        if (!$valid && $user->two_factor_email_enabled) {
             $valid = $this->checkEmailCode($request->two_factor_token, $request->code);
         }
 
