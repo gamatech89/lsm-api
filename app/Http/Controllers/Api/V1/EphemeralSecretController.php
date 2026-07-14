@@ -15,23 +15,33 @@ class EphemeralSecretController extends Controller
     {
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
+            'type' => 'nullable|string|max:50',
             'username' => 'nullable|string|max:1000',
             'password' => 'nullable|string|max:5000',
             'url' => 'nullable|string|max:2000',
+            'hostname' => 'nullable|string|max:255',
+            'port' => 'nullable|string|max:20',
+            'database_name' => 'nullable|string|max:255',
             'note' => 'nullable|string|max:10000',
             'expires_in_minutes' => 'required|integer|min:5|max:10080',
             'access_password' => 'nullable|string|min:4',
         ]);
 
         $fields = array_filter([
+            'type' => $validated['type'] ?? null,
             'username' => $validated['username'] ?? null,
             'password' => $validated['password'] ?? null,
             'url' => $validated['url'] ?? null,
+            'hostname' => $validated['hostname'] ?? null,
+            'port' => $validated['port'] ?? null,
+            'database_name' => $validated['database_name'] ?? null,
             'note' => $validated['note'] ?? null,
         ], fn ($v) => $v !== null && $v !== '');
 
-        if (empty($fields)) {
-            return $this->errorResponse('At least one of username, password, url or note is required.', 422);
+        // Require at least one actual secret value — a type label alone is not enough.
+        $secretKeys = ['username', 'password', 'url', 'hostname', 'port', 'database_name', 'note'];
+        if (empty(array_intersect_key($fields, array_flip($secretKeys)))) {
+            return $this->errorResponse('At least one of username, password, URL, host or note is required.', 422);
         }
 
         $secret = EphemeralSecret::create([
