@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -113,6 +114,21 @@ class SupportTicket extends Model
         return $this->belongsTo(Todo::class);
     }
 
+    public function messages(): HasMany
+    {
+        return $this->hasMany(SupportTicketMessage::class)->orderBy('created_at');
+    }
+
+    public function staffMessages(): HasMany
+    {
+        return $this->hasMany(SupportTicketMessage::class)->where('author_type', 'staff');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SupportTicketAttachment::class);
+    }
+
     // =========================================================================
     // SCOPES
     // =========================================================================
@@ -214,5 +230,39 @@ class SupportTicket extends Model
         $this->update(['todo_id' => $todo->id]);
 
         return $todo;
+    }
+
+    /**
+     * Append a client reply. Reopens resolved/closed tickets and flags unread for staff.
+     */
+    public function addClientMessage(string $message, ?string $authorName = null): SupportTicketMessage
+    {
+        $msg = $this->messages()->create([
+            'author_type' => 'client',
+            'author_name' => $authorName ?: ($this->client_name ?: $this->client_email),
+            'message' => $message,
+        ]);
+
+        $updates = ['read_at' => null];
+        if (in_array($this->status, ['resolved', 'closed'])) {
+            $updates['status'] = 'in_progress';
+            $updates['resolved_at'] = null;
+        }
+        $this->update($updates);
+
+        return $msg;
+    }
+
+    /**
+     * Append a staff reply.
+     */
+    public function addStaffMessage(User $user, string $message): SupportTicketMessage
+    {
+        return $this->messages()->create([
+            'author_type' => 'staff',
+            'user_id' => $user->id,
+            'author_name' => $user->name,
+            'message' => $message,
+        ]);
     }
 }
