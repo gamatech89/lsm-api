@@ -117,7 +117,7 @@ class SupportTicketController extends Controller
     {
         Gate::authorize('view', $supportTicket->project);
 
-        $supportTicket->load('todo:id,title,status');
+        $supportTicket->load(['todo:id,title,status', 'messages.attachments', 'attachments']);
 
         // Auto-mark as read when viewing
         $supportTicket->markAsRead();
@@ -142,12 +142,22 @@ class SupportTicketController extends Controller
             'resolution_notes' => 'nullable|string',
         ]);
 
-        // If marking as resolved, set resolved_at
-        if (isset($validated['status']) && $validated['status'] === 'resolved' && !$supportTicket->resolved_at) {
+        // If marking as resolved, set resolved_at and email the client (only on transition)
+        $becameResolved = isset($validated['status'])
+            && $validated['status'] === 'resolved'
+            && $supportTicket->status !== 'resolved';
+
+        if ($becameResolved && !$supportTicket->resolved_at) {
             $validated['resolved_at'] = now();
         }
 
         $supportTicket->update($validated);
+
+        if ($becameResolved && $supportTicket->client_email) {
+            \Illuminate\Support\Facades\Notification::route('mail', $supportTicket->client_email)
+                ->notify(new \App\Notifications\SupportTicketResolvedNotification($supportTicket));
+        }
+
         $supportTicket->load('todo:id,title,status');
 
         return new SupportTicketResource($supportTicket);
@@ -221,6 +231,43 @@ class SupportTicketController extends Controller
         $count = $project->supportTickets()->unread()->count();
 
         return $this->successResponse(['count' => $count]);
+    }
+
+    /**
+     * Add a staff reply to the ticket thread and email the client.
+     */
+    public function storeMessage(Request $request, SupportTicket $supportTicket): JsonResponse
+    {
+        Gate::authorize('update', $supportTicket->project);
+
+        $validated = $request->validate(array_merge(
+            ['message' => 'required|string'],
+            \App\Services\SupportTicketAttachmentService::rules()
+        ));
+
+        $message = $supportTicket->addStaffMessage($request->user(), $validated['message']);
+        app(\App\Services\SupportTicketAttachmentService::class)
+            ->store($supportTicket, $message, $request->file('attachments', []));
+
+        if ($supportTicket->client_email) {
+            \Illuminate\Support\Facades\Notification::route('mail', $supportTicket->client_email)
+                ->notify(new \App\Notifications\SupportTicketStaffReplyNotification($supportTicket, $message));
+        }
+
+        return $this->createdResponse(
+            new \App\Http\Resources\SupportTicketMessageResource($message->load('attachments')),
+            'Reply added'
+        );
+    }
+
+    /**
+     * Download a ticket attachment (staff).
+     */
+    public function downloadAttachment(\App\Models\SupportTicketAttachment $attachment)
+    {
+        Gate::authorize('view', $attachment->ticket->project);
+
+        return app(\App\Services\SupportTicketAttachmentService::class)->download($attachment);
     }
 
     // =========================================================================

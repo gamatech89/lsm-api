@@ -64,6 +64,18 @@ class SupportTicketResource extends JsonResource
                 ];
             }),
             
+            // Conversation thread (loaded on show)
+            'messages' => SupportTicketMessageResource::collection($this->whenLoaded('messages')),
+            'attachments' => $this->whenLoaded('attachments', fn () => $this->attachments
+                ->whereNull('support_ticket_message_id')
+                ->values()
+                ->map(fn ($a) => [
+                    'id' => $a->id,
+                    'filename' => $a->filename,
+                    'mime' => $a->mime,
+                    'size' => $a->size,
+                ])),
+
             // Timestamps
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

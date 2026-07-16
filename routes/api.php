@@ -367,11 +367,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // -------------------------------------------------
         Route::get('/support-tickets', [V1\SupportTicketController::class, 'indexAll'])
             ->name('support-tickets.index-all');
+        Route::get('/support-tickets/attachments/{attachment}', [V1\SupportTicketController::class, 'downloadAttachment'])
+            ->name('support-tickets.attachments.download');
         Route::apiResource('projects.support-tickets', V1\SupportTicketController::class)->shallow();
         Route::post('/support-tickets/{support_ticket}/mark-read', [V1\SupportTicketController::class, 'markAsRead'])
             ->name('support-tickets.mark-read');
         Route::post('/support-tickets/{support_ticket}/create-todo', [V1\SupportTicketController::class, 'createTodo'])
             ->name('support-tickets.create-todo');
+        Route::post('/support-tickets/{support_ticket}/messages', [V1\SupportTicketController::class, 'storeMessage'])
+            ->name('support-tickets.messages.store');
         Route::get('/projects/{project}/support-tickets/unread-count', [V1\SupportTicketController::class, 'unreadCount'])
             ->name('projects.support-tickets.unread-count');
 
