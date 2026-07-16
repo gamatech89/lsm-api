@@ -199,6 +199,27 @@ class Project extends Model
     }
 
     /**
+     * All users who should be notified about this project's support tickets:
+     * every admin plus the assigned managers and developers (legacy single
+     * columns and many-to-many pivots), deduplicated.
+     */
+    public function notifiableTeamMembers(): \Illuminate\Support\Collection
+    {
+        $members = User::where('role', 'admin')->get()
+            ->merge($this->managers()->get())
+            ->merge($this->developers()->get());
+
+        if ($this->manager) {
+            $members->push($this->manager);
+        }
+        if ($this->developer) {
+            $members->push($this->developer);
+        }
+
+        return $members->unique('id')->values();
+    }
+
+    /**
      * Get the credentials for the project.
      */
     public function credentials(): HasMany
