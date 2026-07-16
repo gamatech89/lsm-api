@@ -205,7 +205,7 @@ class Project extends Model
      */
     public function notifiableTeamMembers(): \Illuminate\Support\Collection
     {
-        $members = User::where('role', 'admin')->get()
+        $members = User::where('role', 'admin')->orWhere('is_admin', true)->get()
             ->merge($this->managers()->get())
             ->merge($this->developers()->get());
 

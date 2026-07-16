@@ -12,6 +12,7 @@ test('notifiableTeamMembers includes admins and assigned team, deduplicated', fu
     $manager = User::factory()->create(['role' => 'manager']);
     $developer = User::factory()->create(['role' => 'developer']);
     $outsider = User::factory()->create(['role' => 'developer']);
+    $flaggedAdmin = User::factory()->create(['role' => 'developer', 'is_admin' => true]);
 
     $project = Project::factory()->create([
         'manager_id' => $manager->id,
@@ -26,6 +27,7 @@ test('notifiableTeamMembers includes admins and assigned team, deduplicated', fu
     expect($ids)->toContain($admin->id);
     expect($ids)->toContain($manager->id);
     expect($ids)->toContain($developer->id);
+    expect($ids)->toContain($flaggedAdmin->id);
     expect($ids)->not->toContain($outsider->id);
     expect($ids->count())->toBe($ids->unique()->count());
 });
