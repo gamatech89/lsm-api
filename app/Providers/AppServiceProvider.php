@@ -37,6 +37,16 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Rate limiter for WP-plugin ticket routes - 30/min per site API key
+        // (falls back to IP when the key is missing so unauthenticated
+        // probing can't dodge the limit)
+        RateLimiter::for('lsm-plugin', function (Request $request) {
+            $key = $request->header('X-LSM-Key');
+
+            return Limit::perMinute(30)
+                ->by($key ? 'lsm-key:' . hash('sha256', $key) : 'lsm-ip:' . $request->ip());
+        });
+
         // Register time tracking policies
         Gate::policy(TimeEntry::class, TimeEntryPolicy::class);
         Gate::policy(Timesheet::class, TimesheetPolicy::class);

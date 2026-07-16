@@ -77,7 +77,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
     // PLUGIN TICKETING (authenticated via X-LSM-Key header)
     Route::prefix('plugin/support-tickets')
-        ->middleware(['throttle:30,1', \App\Http\Middleware\AuthenticateLsmPlugin::class])
+        ->middleware(['throttle:lsm-plugin', \App\Http\Middleware\AuthenticateLsmPlugin::class])
         ->name('plugin.support-tickets.')
         ->group(function () {
             Route::get('/', [V1\PluginTicketController::class, 'index'])->name('index');

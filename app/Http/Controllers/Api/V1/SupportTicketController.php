@@ -265,6 +265,8 @@ class SupportTicketController extends Controller
      */
     public function downloadAttachment(\App\Models\SupportTicketAttachment $attachment)
     {
+        abort_unless($attachment->ticket, 404); // parent ticket may be soft-deleted
+
         Gate::authorize('view', $attachment->ticket->project);
 
         return app(\App\Services\SupportTicketAttachmentService::class)->download($attachment);

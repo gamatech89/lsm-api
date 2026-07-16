@@ -108,3 +108,31 @@ test('staff can download attachments, unauthenticated users cannot', function ()
     $this->getJson("/api/v1/support-tickets/attachments/{$attachment->id}")->assertStatus(401);
     $this->actingAs($admin)->get("/api/v1/support-tickets/attachments/{$attachment->id}")->assertOk();
 });
+
+test('staff download returns 404 when the parent ticket is soft-deleted', function () {
+    Storage::fake('local');
+    $admin = User::factory()->create(['role' => 'admin']);
+    $ticket = staffTicket();
+    $path = UploadedFile::fake()->image('x.png')->store("support-attachments/{$ticket->id}", 'local');
+    $attachment = $ticket->attachments()->create([
+        'filename' => 'x.png', 'path' => $path, 'mime' => 'image/png', 'size' => 10,
+    ]);
+
+    $ticket->delete(); // soft delete
+
+    $this->actingAs($admin)->getJson("/api/v1/support-tickets/attachments/{$attachment->id}")
+        ->assertNotFound();
+});
+
+test('staff without project access cannot download attachments', function () {
+    Storage::fake('local');
+    $outsider = User::factory()->create(['role' => 'developer']);
+    $ticket = staffTicket();
+    $path = UploadedFile::fake()->image('x.png')->store("support-attachments/{$ticket->id}", 'local');
+    $attachment = $ticket->attachments()->create([
+        'filename' => 'x.png', 'path' => $path, 'mime' => 'image/png', 'size' => 10,
+    ]);
+
+    $this->actingAs($outsider)->getJson("/api/v1/support-tickets/attachments/{$attachment->id}")
+        ->assertForbidden();
+});

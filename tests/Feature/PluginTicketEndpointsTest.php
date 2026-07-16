@@ -141,3 +141,15 @@ test('legacy webhook still creates tickets and now notifies staff', function () 
     $response->assertCreated();
     Notification::assertSentTo($admin, SupportTicketReceivedNotification::class);
 });
+
+test('validation errors return JSON 422 even without an Accept header', function () {
+    pluginProject('KEY_NOACCEPT');
+
+    $response = $this->post('/api/v1/plugin/support-tickets', [
+        'type' => 'bug',
+        // subject/message/client_email missing
+    ], ['X-LSM-Key' => 'KEY_NOACCEPT']);
+
+    $response->assertStatus(422);
+    expect($response->json('errors'))->not->toBeNull();
+});

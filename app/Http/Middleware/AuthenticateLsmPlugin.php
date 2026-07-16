@@ -1,5 +1,4 @@
 <?php
-// app/Http/Middleware/AuthenticateLsmPlugin.php
 
 namespace App\Http\Middleware;
 
@@ -20,6 +19,10 @@ class AuthenticateLsmPlugin
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Plugin callers are machines: always answer in JSON, even when the
+        // HTTP client forgot the Accept header (WP's wp_remote_* defaults).
+        $request->headers->set('Accept', 'application/json');
+
         $key = (string) $request->header('X-LSM-Key', '');
 
         if ($key === '') {
