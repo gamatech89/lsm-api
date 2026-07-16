@@ -307,6 +307,10 @@ class SupportTicketController extends Controller
                 'priority' => $priority,
             ]);
 
+            foreach ($project->notifiableTeamMembers() as $member) {
+                $member->notify(new \App\Notifications\SupportTicketReceivedNotification($ticket));
+            }
+
             Log::info('Support ticket created from WordPress', [
                 'ticket_number' => $ticket->ticket_number,
                 'project_id' => $project->id,
