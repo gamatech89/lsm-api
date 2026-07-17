@@ -103,7 +103,7 @@ class GdprAuditController extends Controller
     public function checkAuditStatus(Project $project, Request $request): JsonResponse
     {
         $request->validate([
-            'jobId' => 'required|string',
+            'jobId' => 'required|uuid',
             'locale' => 'in:en,de',
         ]);
 

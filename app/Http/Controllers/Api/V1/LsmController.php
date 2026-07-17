@@ -597,6 +597,8 @@ class LsmController extends Controller
      */
     public function downloadPlugin(Request $request, Project $project)
     {
+        Gate::authorize('view', $project);
+
         // Path to the plugin directory
         $pluginPath = base_path('wordpress-plugin/landeseiten-maintenance');
         $zipFileName = 'landeseiten-maintenance.zip';
