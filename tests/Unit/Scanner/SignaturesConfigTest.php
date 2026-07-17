@@ -1,6 +1,5 @@
 <?php
 // tests/Unit/Scanner/SignaturesConfigTest.php
-use function Pest\Laravel\artisan;
 
 it('exposes signature config with required top-level keys', function () {
     $cfg = config('scanner_signatures');
