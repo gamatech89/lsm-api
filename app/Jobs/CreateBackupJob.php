@@ -257,7 +257,7 @@ class CreateBackupJob implements ShouldQueue
         // Download file from WordPress
         $response = Http::timeout(300)
             ->withHeaders([
-                'X-Health-Check-Secret' => $project->health_check_secret,
+                'X-LSM-Key' => $project->health_check_secret,
             ])
             ->get($downloadUrl);
 

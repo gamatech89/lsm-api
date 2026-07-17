@@ -56,9 +56,11 @@ class ProjectResource extends JsonResource
             'wp_version' => $this->wp_version,
             'php_version' => $this->php_version,
             'outdated_plugins_count' => $this->outdated_plugins_count,
-            
-            // RMB Plugin integration
-            'health_check_secret' => $this->health_check_secret,
+            'uptime_monitoring_enabled' => (bool) ($this->uptime_monitoring_enabled ?? true),
+
+            // LSM plugin integration — the secret itself is write-only and
+            // never serialized; clients only need to know whether it is set.
+            'has_health_check_secret' => !empty($this->health_check_secret),
             
             // Relationships (conditionally loaded)
             'manager_id' => $this->manager_id,

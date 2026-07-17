@@ -3,7 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\Project;
+use App\Models\User;
+use App\Notifications\DomainExpiringNotification;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CheckDomainExpiry extends Command
@@ -19,8 +22,9 @@ class CheckDomainExpiry extends Command
         $this->info('Checking domain expiry dates...');
         $this->newLine();
 
-        $query = Project::whereNotNull('url');
-        
+        $query = Project::whereNotNull('url')
+            ->where('status', '!=', 'archived');
+
         if ($this->option('project')) {
             $query->where('id', $this->option('project'));
         }
@@ -56,6 +60,8 @@ class CheckDomainExpiry extends Command
                     if (!empty($updateData)) {
                         $project->update($updateData);
                     }
+
+                    $this->maybeNotifyExpiring($project, $whoisData);
                 }
 
                 $this->newLine();
@@ -188,6 +194,63 @@ class CheckDomainExpiry extends Command
             'registrar' => $registrar,
             'days_until_expiry' => (int) ((strtotime($expiresAt) - time()) / 86400),
         ];
+    }
+
+    /**
+     * Alert the project team when the domain expires within 30 days.
+     * The command runs weekly, so a 6-day dedup window means one alert per run.
+     */
+    private function maybeNotifyExpiring(Project $project, array $whoisData): void
+    {
+        if ($project->domain_alerts_enabled === false) {
+            return;
+        }
+
+        $daysRemaining = $whoisData['days_until_expiry'] ?? null;
+        if ($daysRemaining === null || $daysRemaining > 30) {
+            return;
+        }
+
+        $daysRemaining = max($daysRemaining, 0);
+
+        $recentlyNotified = DB::table('notifications')
+            ->where('type', DomainExpiringNotification::class)
+            ->where('data->project_id', $project->id)
+            ->where('created_at', '>=', now()->subDays(6))
+            ->exists();
+
+        if ($recentlyNotified) {
+            return;
+        }
+
+        foreach ($this->getProjectMembers($project) as $member) {
+            $member->notify(new DomainExpiringNotification(
+                $project,
+                $whoisData['expires_at'],
+                $daysRemaining,
+            ));
+        }
+    }
+
+    private function getProjectMembers(Project $project)
+    {
+        $members = collect();
+
+        foreach ($project->managers as $manager) {
+            $members->push($manager);
+        }
+        if ($members->isEmpty() && $project->manager_id) {
+            $members->push(User::find($project->manager_id));
+        }
+        if ($project->developer_id) {
+            $members->push(User::find($project->developer_id));
+        }
+        foreach ($project->developers as $dev) {
+            $members->push($dev);
+        }
+        $members = $members->merge(User::where('role', 'admin')->get());
+
+        return $members->filter()->unique('id');
     }
 
     private function displaySummary(array $results): void

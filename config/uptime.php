@@ -39,13 +39,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Alerting (Future)
+    | History Retention
     |--------------------------------------------------------------------------
     */
 
-    // Send alerts when sites go down (future feature)
-    'alerts_enabled' => env('UPTIME_ALERTS_ENABLED', false),
-
-    // Minutes a site must be down before alerting
-    'alert_threshold_minutes' => env('UPTIME_ALERT_THRESHOLD', 10),
+    // Days of uptime_checks history to keep; older rows are pruned nightly.
+    'retention_days' => env('UPTIME_RETENTION_DAYS', 90),
 ];

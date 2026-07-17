@@ -566,9 +566,10 @@ class ProjectController extends Controller
             'uptime_percentage' => $stats['uptime_percentage'],
             'total_checks' => $stats['total_checks'],
             'up_count' => $stats['up_count'],
-            'redirect_count' => $stats['redirect_count'] ?? 0,
             'down_count' => $stats['down_count'],
-            'avg_response_time' => round($stats['avg_response_time']),
+            'avg_response_time' => $stats['avg_response_time'] !== null
+                ? round($stats['avg_response_time'])
+                : null,
             'days' => $days,
             'recent_checks' => $recentChecks->map(fn ($check) => [
                 'status' => $check->status,
