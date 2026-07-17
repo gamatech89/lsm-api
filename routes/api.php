@@ -88,6 +88,17 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/{supportTicket}/messages', [V1\PluginTicketController::class, 'storeMessage'])->name('messages.store');
         });
 
+    // WP PLUGIN MALWARE SCANNER (authenticated via X-LSM-Key header)
+    Route::prefix('scanner')
+        ->middleware(['throttle:lsm-plugin', \App\Http\Middleware\AuthenticateLsmPlugin::class])
+        ->name('plugin.scanner.')
+        ->group(function () {
+            Route::post('/session', [V1\ScannerCollectorController::class, 'session'])->name('session');
+            Route::post('/manifest', [V1\ScannerCollectorController::class, 'manifest'])->name('manifest');
+            Route::post('/files', [V1\ScannerCollectorController::class, 'files'])->name('files');
+            Route::post('/finalize', [V1\ScannerCollectorController::class, 'finalize'])->name('finalize');
+        });
+
     // WP PLUGIN UPDATE CHECK (Public - used by WP updater since GitHub may be blocked on hosting)
     Route::get('/plugin/latest-release', [V1\PluginReleaseController::class, 'latestRelease'])
         ->middleware('throttle:30,1')
