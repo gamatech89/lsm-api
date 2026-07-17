@@ -46,3 +46,30 @@ it('does not flag ordinary source code', function () {
     expect(engine()->entropyFindings('wp-content/themes/t/f.php', "<?php\nfunction hello() { return 'world'; }\n"))
         ->toBe([]);
 });
+
+it('flags SEO cloaking in htaccess', function () {
+    $ht = "RewriteCond %{HTTP_USER_AGENT} googlebot [NC]\nRewriteRule .* /cloak.php";
+    $f = engine()->scanHtaccess('.htaccess', $ht, 'example.com');
+    expect($f)->not->toBeEmpty()->and($f[0]['severity'])->toBe('critical');
+});
+
+it('flags an admin with no email as critical', function () {
+    $f = engine()->analyzeDatabase(['admins' => [
+        ['id' => 5, 'login' => 'sys_8990948d', 'email' => '', 'registered' => '2026-01-01 00:00:00'],
+    ]]);
+    $types = array_column($f, 'type');
+    expect($types)->toContain('admin_no_email');
+});
+
+it('flags a mass-publication day as critical spam', function () {
+    $f = engine()->analyzeDatabase(['posts' => [
+        'mass_days' => [['date' => '2026-06-01', 'count' => 7000]],
+    ]]);
+    expect(array_column($f, 'type'))->toContain('mass_published_posts');
+});
+
+it('returns no findings for a clean database payload', function () {
+    expect(engine()->analyzeDatabase([
+        'admins' => [['id' => 1, 'login' => 'owner', 'email' => 'a@b.com', 'registered' => '2020-01-01 00:00:00']],
+    ]))->toBe([]);
+});
