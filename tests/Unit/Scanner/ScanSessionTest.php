@@ -33,3 +33,42 @@ it('reports clean when there are no threats', function () {
     expect($s->assembleResults()['summary']['clean'])->toBeTrue()
         ->and($s->assembleResults()['summary']['risk_level'])->toBe('clean');
 });
+
+it('does not count info-severity findings as warnings or fail a module', function () {
+    $s = ScanSession::create(1, 99, 'full');
+    $s->addFindings('suspicious_files', [
+        ['file' => 'plugins/akismet', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/woocommerce', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/yoast-seo', 'severity' => 'info', 'type' => 'plugin_dir'],
+    ]);
+
+    $out = $s->assembleResults();
+
+    expect($out['summary']['warnings_found'])->toBe(0)
+        ->and($out['summary']['threats_found'])->toBe(0)
+        ->and($out['summary']['clean'])->toBeTrue()
+        ->and($out['summary']['risk_level'])->toBe('clean')
+        ->and($out['results']['suspicious_files']['status'])->toBe('pass')
+        ->and($out['results']['suspicious_files']['findings'])->toHaveCount(3);
+});
+
+it('never lets info findings inflate warnings even alongside real threats', function () {
+    $s = ScanSession::create(1, 100, 'full');
+    $s->addFindings('malware_signatures', [
+        ['file' => 'evil.php', 'severity' => 'critical', 'description' => 'd'],
+    ]);
+    $s->addFindings('suspicious_files', [
+        ['file' => 'plugins/one', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/two', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/three', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/four', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/five', 'severity' => 'info', 'type' => 'plugin_dir'],
+        ['file' => 'plugins/six', 'severity' => 'info', 'type' => 'plugin_dir'],
+    ]);
+
+    $out = $s->assembleResults();
+
+    expect($out['summary']['threats_found'])->toBe(1)
+        ->and($out['summary']['warnings_found'])->toBe(0)
+        ->and($out['summary']['risk_level'])->toBe('medium');
+});

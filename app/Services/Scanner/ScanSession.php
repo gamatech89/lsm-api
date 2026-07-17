@@ -66,7 +66,7 @@ class ScanSession
             foreach ($findings as $fnd) {
                 $sev = $fnd['severity'] ?? 'low';
                 if (in_array($sev, ['critical', 'high'], true)) { $threats++; $status = 'fail'; }
-                else { $warnings++; if ($status === 'pass') $status = 'warning'; }
+                elseif ($sev !== 'info') { $warnings++; if ($status === 'pass') $status = 'warning'; }
             }
             $results[$module] = ['status' => $status, 'findings' => $findings];
         }
