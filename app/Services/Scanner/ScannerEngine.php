@@ -62,6 +62,55 @@ class ScannerEngine
         };
     }
 
+    public function entropyFindings(string $relativePath, string $content): array
+    {
+        if (preg_match_all('/[\'"][^\'"\n]{200,}[\'"]/s', $content, $m)) {
+            foreach ($m[0] as $long) {
+                $entropy = $this->shannonEntropy($long);
+                if ($entropy > 5.5) {
+                    return [[
+                        'file' => $relativePath,
+                        'description' => sprintf('High-entropy string detected (entropy: %.2f) — likely obfuscated payload', $entropy),
+                        'severity' => $entropy > 6.0 ? 'critical' : 'high',
+                        'entropy' => round($entropy, 2),
+                        'string_length' => strlen($long),
+                        'preview' => substr($long, 0, 80) . '...',
+                    ]];
+                }
+            }
+        }
+
+        foreach (explode("\n", $content) as $i => $line) {
+            if (strlen($line) > 1000) {
+                $entropy = $this->shannonEntropy($line);
+                if ($entropy > 5.0) {
+                    return [[
+                        'file' => $relativePath,
+                        'line' => $i + 1,
+                        'description' => sprintf('Very long line (%d chars) with high entropy (%.2f) — potential obfuscated code', strlen($line), $entropy),
+                        'severity' => 'high',
+                        'entropy' => round($entropy, 2),
+                    ]];
+                }
+            }
+        }
+
+        return [];
+    }
+
+    public function shannonEntropy(string $data): float
+    {
+        $len = strlen($data);
+        if ($len === 0) return 0.0;
+        $freq = count_chars($data, 1);
+        $entropy = 0.0;
+        foreach ($freq as $count) {
+            $p = $count / $len;
+            $entropy -= $p * log($p, 2);
+        }
+        return $entropy;
+    }
+
     private function snippetAt(string $content, int $pos): string
     {
         $start = max(0, $pos - 50);

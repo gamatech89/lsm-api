@@ -28,3 +28,21 @@ it('returns an empty array for clean content', function () {
     expect(engine()->scanContent('wp-content/themes/t/functions.php', "<?php add_action('init', fn() => null);"))
         ->toBe([]);
 });
+
+it('computes shannon entropy near 0 for a repeated byte', function () {
+    expect(engine()->shannonEntropy(str_repeat('A', 500)))->toBeLessThan(0.01);
+});
+
+it('flags a long high-entropy string as obfuscation', function () {
+    $blob = base64_encode(random_bytes(400)); // ~533 chars, entropy ~6
+    $php = "<?php \$x = '{$blob}';";
+    $findings = engine()->entropyFindings('wp-content/themes/t/a.php', $php);
+    expect($findings)->not->toBeEmpty()
+        ->and($findings[0]['entropy'])->toBeGreaterThan(5.5)
+        ->and($findings[0]['severity'])->toBeIn(['high', 'critical']);
+});
+
+it('does not flag ordinary source code', function () {
+    expect(engine()->entropyFindings('wp-content/themes/t/f.php', "<?php\nfunction hello() { return 'world'; }\n"))
+        ->toBe([]);
+});
