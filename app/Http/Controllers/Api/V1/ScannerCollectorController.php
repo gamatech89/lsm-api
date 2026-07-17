@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Project;
 use App\Services\Scanner\ChecksumService;
 use App\Services\Scanner\ManifestStore;
 use App\Services\Scanner\ScannerEngine;
@@ -56,6 +55,72 @@ class ScannerCollectorController extends Controller
         $manifests->save($session->projectId(), $data['manifest']);
 
         return response()->json(['success' => true, 'needed_paths' => $needed]);
+    }
+
+    public function files(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => 'required|string',
+            'files' => 'required|array',
+            'files.*.path' => 'required|string',
+            'files.*.content_b64' => 'required|string',
+        ]);
+
+        $session = $this->requireSession($request, $data['token']);
+        if ($session instanceof JsonResponse) return $session;
+
+        $engine = new ScannerEngine(config('scanner_signatures'));
+        $scanned = 0;
+        foreach ($data['files'] as $file) {
+            $content = base64_decode($file['content_b64'], true);
+            if ($content === false) continue;
+            $session->addFindings('malware_signatures', $engine->scanContent($file['path'], $content));
+            $session->addFindings('entropy_analysis', $engine->entropyFindings($file['path'], $content));
+            $scanned++;
+        }
+        $session->incrementFilesScanned($scanned);
+
+        return response()->json(['success' => true, 'scanned' => $scanned]);
+    }
+
+    public function finalize(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => 'required|string',
+            'home_host' => 'required|string',
+            'htaccess_files' => 'array',
+            'htaccess_files.*.path' => 'required_with:htaccess_files|string',
+            'htaccess_files.*.content_b64' => 'required_with:htaccess_files|string',
+            'database' => 'array',
+            'suspicious_files' => 'array',
+            'permissions' => 'array',
+        ]);
+
+        $session = $this->requireSession($request, $data['token']);
+        if ($session instanceof JsonResponse) return $session;
+
+        $engine = new ScannerEngine(config('scanner_signatures'));
+
+        foreach ($data['htaccess_files'] ?? [] as $ht) {
+            $content = base64_decode($ht['content_b64'], true);
+            if ($content === false) continue;
+            $session->addFindings('htaccess', $engine->scanHtaccess($ht['path'], $content, $data['home_host']));
+        }
+
+        if (!empty($data['database'])) {
+            $session->addFindings('database', $engine->analyzeDatabase($data['database']));
+        }
+        if (!empty($data['suspicious_files'])) {
+            $session->addFindings('suspicious_files', $data['suspicious_files']);
+        }
+        if (!empty($data['permissions'])) {
+            $session->addFindings('permissions', $data['permissions']);
+        }
+
+        $results = $session->assembleResults();
+        $session->forget();
+
+        return response()->json(['success' => true, 'results' => $results]);
     }
 
     private function requireSession(Request $request, string $token): ScanSession|JsonResponse
