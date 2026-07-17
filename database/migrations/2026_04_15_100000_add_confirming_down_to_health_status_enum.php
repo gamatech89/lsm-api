@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -16,23 +18,27 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // ENUM MODIFY is MySQL-specific. SQLite (used in the test suite) stores
-        // enums as unconstrained TEXT, so the alter is a no-op there.
-        if (DB::getDriverName() !== 'mysql') {
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE projects MODIFY COLUMN health_status ENUM('online', 'down_error', 'updating', 'confirming_down') NOT NULL DEFAULT 'online'");
+
             return;
         }
 
-        DB::statement("ALTER TABLE projects MODIFY COLUMN health_status ENUM('online', 'down_error', 'updating', 'confirming_down') NOT NULL DEFAULT 'online'");
+        // On SQLite the original enum() produced a varchar with a CHECK
+        // constraint that rejects 'confirming_down'. Rebuilding the column as
+        // a plain string drops that constraint.
+        Schema::table('projects', function (Blueprint $table) {
+            $table->string('health_status')->default('online')->change();
+        });
     }
 
     public function down(): void
     {
-        if (DB::getDriverName() !== 'mysql') {
-            return;
-        }
-
         // Reset any 'confirming_down' rows to 'online' before shrinking the enum
         DB::statement("UPDATE projects SET health_status = 'online' WHERE health_status = 'confirming_down'");
-        DB::statement("ALTER TABLE projects MODIFY COLUMN health_status ENUM('online', 'down_error', 'updating') NOT NULL DEFAULT 'online'");
+
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE projects MODIFY COLUMN health_status ENUM('online', 'down_error', 'updating') NOT NULL DEFAULT 'online'");
+        }
     }
 };

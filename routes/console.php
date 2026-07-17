@@ -13,24 +13,25 @@ Artisan::command('inspire', function () {
 | Scheduled Tasks
 |--------------------------------------------------------------------------
 |
-| Health checks run 3 times per day: 8:00, 14:00, and 20:00
-| Uses --deep flag to check WordPress plugin health data where available
+| Health data collection runs 3 times per day: 8:00, 14:00, and 20:00.
+| Uses --deep flag to check WordPress plugin health data where available.
+| Outage detection and notifications are owned by sites:check-uptime below.
 |
 */
 
-Schedule::command('projects:health-check --deep --notify')
+Schedule::command('projects:health-check --deep')
     ->dailyAt('08:00')
     ->timezone('Europe/Berlin')
     ->withoutOverlapping()
     ->runInBackground();
 
-Schedule::command('projects:health-check --deep --notify')
+Schedule::command('projects:health-check --deep')
     ->dailyAt('14:00')
     ->timezone('Europe/Berlin')
     ->withoutOverlapping()
     ->runInBackground();
 
-Schedule::command('projects:health-check --deep --notify')
+Schedule::command('projects:health-check --deep')
     ->dailyAt('20:00')
     ->timezone('Europe/Berlin')
     ->withoutOverlapping()
@@ -202,3 +203,19 @@ Schedule::command('ephemeral-secrets:purge')
     ->daily()
     ->onOneServer()
     ->name('ephemeral-secrets-purge');
+
+/*
+|--------------------------------------------------------------------------
+| Uptime History Retention
+|--------------------------------------------------------------------------
+|
+| Prunes uptime_checks rows older than uptime.retention_days (default 90).
+| Without this the table grows by hundreds of rows per project per day.
+|
+*/
+
+Schedule::command('model:prune', ['--model' => \App\Models\UptimeCheck::class])
+    ->dailyAt('02:30')
+    ->timezone('Europe/Berlin')
+    ->onOneServer()
+    ->name('uptime-checks-prune');

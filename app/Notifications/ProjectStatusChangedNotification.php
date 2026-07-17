@@ -54,9 +54,9 @@ class ProjectStatusChangedNotification extends Notification implements ShouldQue
     private function getStatusEmoji(): string
     {
         return match($this->newStatus) {
-            'good', 'healthy' => '✅',
-            'warning', 'at_risk' => '⚠️',
-            'critical', 'vulnerable' => '🚨',
+            'online', 'secure' => '✅',
+            'updating', 'confirming_down', 'monitoring' => '⚠️',
+            'down_error', 'compromised', 'hacked' => '🚨',
             default => '📊',
         };
     }

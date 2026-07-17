@@ -2,17 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Uptime Check Model
- * 
+ *
  * Stores individual uptime check results for historical tracking.
- * 
+ *
  * @property int $id
  * @property int $project_id
- * @property string $status up|down|error|timeout
+ * @property string $status up|down|error|confirming
  * @property int|null $http_status
  * @property int|null $response_time_ms
  * @property string|null $error_message
@@ -20,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class UptimeCheck extends Model
 {
+    use MassPrunable;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -68,50 +71,44 @@ class UptimeCheck extends Model
     }
 
     /**
-     * Calculate uptime percentage for a project over the last N days.
+     * Prune check history past the retention window (see uptime.retention_days).
      */
-    public static function calculateUptime(int $projectId, int $days = 30): float
+    public function prunable()
     {
-        $checks = static::forProject($projectId)
-            ->lastDays($days)
-            ->get();
+        $days = (int) config('uptime.retention_days', 90);
 
-        if ($checks->isEmpty()) {
-            return 0;
-        }
-
-        $upCount = $checks->where('status', 'up')->count();
-        $totalCount = $checks->whereNotIn('status', ['confirming'])->count();
-
-        return round(($upCount / $totalCount) * 100, 2);
+        return static::where('checked_at', '<', now()->subDays($days));
     }
 
     /**
      * Get uptime stats for a project (count, up, down, percentage).
+     *
+     * uptime_percentage and avg_response_time are null when there is no
+     * completed check in the window — "no data" is not the same as 0% uptime.
      */
     public static function getStats(int $projectId, int $days = 30): array
     {
-        $checks = static::forProject($projectId)
-            ->lastDays($days)
-            ->get();
-
         // Exclude 'confirming' — it's an in-progress state, not a completed check result.
-        $total = $checks->whereNotIn('status', ['confirming'])->count();
-        $up = $checks->where('status', 'up')->count();
-        $redirect = $checks->where('status', 'redirect')->count();
-        $down = $checks->whereIn('status', ['down', 'error', 'timeout'])->count();
+        $aggregates = static::forProject($projectId)
+            ->lastDays($days)
+            ->where('status', '!=', 'confirming')
+            ->selectRaw("COUNT(*) as total")
+            ->selectRaw("SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) as up")
+            ->selectRaw("SUM(CASE WHEN status IN ('down', 'error') THEN 1 ELSE 0 END) as down")
+            ->selectRaw("AVG(response_time_ms) as avg_response_time")
+            ->first();
 
-        // Redirects and down status both count against uptime
-        $successfulChecks = $up;
-        $uptimePercentage = $total > 0 ? round(($successfulChecks / $total) * 100, 2) : 0;
+        $total = (int) $aggregates->total;
+        $up = (int) $aggregates->up;
 
         return [
             'total_checks' => $total,
             'up_count' => $up,
-            'redirect_count' => $redirect,
-            'down_count' => $down,
-            'uptime_percentage' => $uptimePercentage,
-            'avg_response_time' => $checks->whereNotNull('response_time_ms')->avg('response_time_ms') ?? 0,
+            'down_count' => (int) $aggregates->down,
+            'uptime_percentage' => $total > 0 ? round(($up / $total) * 100, 2) : null,
+            'avg_response_time' => $aggregates->avg_response_time !== null
+                ? (float) $aggregates->avg_response_time
+                : null,
         ];
     }
 }

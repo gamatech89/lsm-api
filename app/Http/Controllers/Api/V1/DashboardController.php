@@ -101,9 +101,9 @@ class DashboardController extends Controller
             
             $result = $query->selectRaw("
                 COUNT(*) as total,
-                SUM(CASE WHEN health_status = 'online' THEN 1 ELSE 0 END) as online,
-                SUM(CASE WHEN health_status IN ('offline', 'down_error') THEN 1 ELSE 0 END) as offline,
-                SUM(CASE WHEN health_status IN ('maintenance', 'updating') THEN 1 ELSE 0 END) as maintenance,
+                SUM(CASE WHEN health_status IN ('online', 'confirming_down') THEN 1 ELSE 0 END) as online,
+                SUM(CASE WHEN health_status = 'down_error' THEN 1 ELSE 0 END) as offline,
+                SUM(CASE WHEN health_status = 'updating' THEN 1 ELSE 0 END) as maintenance,
                 SUM(CASE WHEN security_status = 'secure' THEN 1 ELSE 0 END) as secure,
                 SUM(CASE WHEN security_status = 'monitoring' THEN 1 ELSE 0 END) as monitoring,
                 SUM(CASE WHEN security_status IN ('at_risk', 'compromised') THEN 1 ELSE 0 END) as at_risk,

@@ -29,6 +29,8 @@ class CheckSiteUptime extends Command
 
     protected int $currentTimeout = 15;
 
+    protected string $userAgent = 'Mozilla/5.0 (compatible; LSM-Uptime-Monitor/1.0)';
+
     /**
      * Execute the command.
      */
@@ -110,13 +112,21 @@ class CheckSiteUptime extends Command
                 $baseUrl = rtrim($project->url, '/');
 
                 // If plugin is connected, check the health endpoint for rich data
-                // Otherwise, just check the project URL directly
+                // Otherwise, just check the project URL directly.
+                // The secret goes in the X-LSM-Key header, never the query string
+                // (query strings end up in access logs).
                 $checkUrl = $project->health_check_secret
-                    ? "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}"
+                    ? "{$baseUrl}/wp-json/lsm/v1/health"
                     : $baseUrl;
+
+                $headers = ['User-Agent' => $this->userAgent];
+                if ($project->health_check_secret) {
+                    $headers['X-LSM-Key'] = $project->health_check_secret;
+                }
 
                 $pool->as($index)
                     ->timeout($timeout)
+                    ->withHeaders($headers)
                     ->withOptions([
                         'allow_redirects' => [
                             'max' => 5,
@@ -166,12 +176,18 @@ class CheckSiteUptime extends Command
         if ($redirectHistory) {
             $effectiveUrl = $transferStats?->getEffectiveUri();
             if ($effectiveUrl) {
-                $effectiveBase = parse_url((string) $effectiveUrl, PHP_URL_SCHEME) 
+                $effectiveBase = parse_url((string) $effectiveUrl, PHP_URL_SCHEME)
                     . '://' . parse_url((string) $effectiveUrl, PHP_URL_HOST);
-                $currentBase = rtrim($project->url, '/');
+                $currentBase = parse_url($project->url, PHP_URL_SCHEME)
+                    . '://' . parse_url($project->url, PHP_URL_HOST);
+                // Only scheme/host corrections (www → non-www, http → https).
+                // The original path must survive — sites living under a subpath
+                // would otherwise get their URL silently truncated.
+                $currentPath = rtrim((string) parse_url($project->url, PHP_URL_PATH), '/');
                 if ($effectiveBase && $effectiveBase !== $currentBase) {
-                    $project->url = $effectiveBase;
-                    Log::info("Auto-corrected URL for {$project->name}: {$currentBase} → {$effectiveBase}");
+                    $oldUrl = $project->url;
+                    $project->url = $effectiveBase . $currentPath;
+                    Log::info("Auto-corrected URL for {$project->name}: {$oldUrl} → {$project->url}");
                 }
             }
         }
@@ -301,7 +317,9 @@ class CheckSiteUptime extends Command
             $updateData['wp_version'] = $data['wordpress']['version'] ?? null;
             $updateData['php_version'] = $data['php']['version'] ?? null;
             $updateData['outdated_plugins_count'] = $data['plugins']['outdated_count'] ?? 0;
-            $updateData['ssl_status'] = ($data['ssl']['enabled'] ?? false) ? 'valid' : 'none';
+            // ssl_status is owned by projects:health-check, whose certificate
+            // probe can distinguish valid/expiring_soon/expired — the plugin's
+            // boolean would flatten that back to 'valid' on every run.
         } else {
             // Simple URL check — just store basic status info
             $updateData['last_health_details'] = [
@@ -529,11 +547,19 @@ class CheckSiteUptime extends Command
             return;
         }
 
-        // Calculate approximate downtime from the last confirmed-down check
+        // Calculate approximate downtime for the CURRENT outage: the first
+        // failed check after the most recent successful one. Searching the
+        // whole window would pick up earlier, already-recovered outages.
+        $lastUpCheck = UptimeCheck::where('project_id', $project->id)
+            ->where('status', 'up')
+            ->where('checked_at', '>=', now()->subDay()) // limit search window to 24h
+            ->orderBy('checked_at', 'desc')
+            ->first();
+
         $firstDownCheck = UptimeCheck::where('project_id', $project->id)
             ->whereIn('status', ['down', 'error'])
+            ->where('checked_at', '>=', $lastUpCheck?->checked_at ?? now()->subDay())
             ->orderBy('checked_at', 'asc')
-            ->where('checked_at', '>=', now()->subDay()) // limit search window to 24h
             ->first();
 
         $downtimeDuration = $firstDownCheck
@@ -611,7 +637,9 @@ class CheckSiteUptime extends Command
     {
         try {
             $baseUrl = rtrim($project->url, '/');
-            $response = Http::timeout(min($this->currentTimeout, 10))->get($baseUrl);
+            $response = Http::timeout(min($this->currentTimeout, 10))
+                ->withHeaders(['User-Agent' => $this->userAgent])
+                ->get($baseUrl);
             return $response->successful() || $response->status() === 429;
         } catch (\Exception $e) {
             return false;
@@ -627,9 +655,15 @@ class CheckSiteUptime extends Command
         try {
             $baseUrl = rtrim($project->url, '/');
             $checkUrl = $project->health_check_secret
-                ? "{$baseUrl}/wp-json/lsm/v1/health?key={$project->health_check_secret}"
+                ? "{$baseUrl}/wp-json/lsm/v1/health"
                 : $baseUrl;
-            $response = Http::timeout(min($this->currentTimeout, 10))->get($checkUrl);
+            $headers = ['User-Agent' => $this->userAgent];
+            if ($project->health_check_secret) {
+                $headers['X-LSM-Key'] = $project->health_check_secret;
+            }
+            $response = Http::timeout(min($this->currentTimeout, 10))
+                ->withHeaders($headers)
+                ->get($checkUrl);
             return $response->successful() || $response->status() === 429;
         } catch (\Exception $e) {
             return false;

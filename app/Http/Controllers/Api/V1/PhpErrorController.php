@@ -68,10 +68,12 @@ class PhpErrorController extends Controller
      */
     public function store(Project $project, Request $request): JsonResponse
     {
-        // This endpoint may be called by the WordPress plugin, so we verify via secret
-        $secret = $request->header('X-Health-Check-Secret');
-        
-        if (!$secret || $secret !== $project->health_check_secret) {
+        // This endpoint may be called by the WordPress plugin, so we verify via secret.
+        // X-LSM-Key is the standard plugin header; X-Health-Check-Secret is legacy.
+        $secret = $request->header('X-LSM-Key') ?? $request->header('X-Health-Check-Secret');
+        $expected = $project->health_check_secret;
+
+        if (!$secret || !$expected || !hash_equals($expected, $secret)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized',
