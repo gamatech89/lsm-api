@@ -38,7 +38,9 @@ class ScannerCollectorController extends Controller
             'token' => 'required|string',
             'wp_version' => 'required|string',
             'locale' => 'nullable|string',
-            'manifest' => 'required|array',
+            // Finite app-level cap on manifest entries so an authenticated-but-compromised
+            // client can't push an unbounded manifest payload.
+            'manifest' => 'required|array|max:100000',
             'manifest.*.path' => 'required|string',
             'manifest.*.md5' => 'required|string',
             'manifest.*.size' => 'required|integer',
@@ -61,9 +63,12 @@ class ScannerCollectorController extends Controller
     {
         $data = $request->validate([
             'token' => 'required|string',
-            'files' => 'required|array',
+            // Bounds mirror the plugin-side contract: batches of up to 500 files,
+            // each file capped at ~2.8M base64 chars (~2MB decoded), matching the
+            // 2MB max_file_size / 2MB batch_bytes advertised in session().
+            'files' => 'required|array|max:500',
             'files.*.path' => 'required|string',
-            'files.*.content_b64' => 'required|string',
+            'files.*.content_b64' => 'required|string|max:2800000',
         ]);
 
         $session = $this->requireSession($request, $data['token']);

@@ -97,16 +97,20 @@ class SecurityScanController extends Controller
             ], 502);
         }
 
-        // Store the results
-        $riskLevel = $results['status'] ?? 'unknown';
+        // Store the results.
+        // NOTE: $results follows the frozen ScanSession::assembleResults() shape —
+        // `status` is the scan LIFECYCLE status ('completed'|'partial'), NOT the risk.
+        // The real risk lives at summary.risk_level and the real file count at
+        // summary.total_files_scanned.
         $summary = $results['summary'] ?? [];
+        $riskLevel = $summary['risk_level'] ?? 'unknown';
 
         $scan->update([
-            'status' => 'completed',
+            'status' => $results['status'] ?? 'completed',
             'risk_level' => $riskLevel,
             'threats_found' => $summary['threats_found'] ?? 0,
             'warnings_found' => $summary['warnings_found'] ?? 0,
-            'files_scanned' => $summary['files_scanned'] ?? 0,
+            'files_scanned' => $summary['total_files_scanned'] ?? 0,
             'duration_seconds' => $results['duration_seconds'] ?? null,
             'results' => $results,
             'summary' => $summary,

@@ -188,7 +188,7 @@ class ScannerEngine
             foreach ($this->scanContent(($s['source'] ?? 'snippet') . '.php', (string) ($s['code'] ?? '')) as $hit) {
                 $f[] = ['type' => 'malicious_' . ($s['source'] ?? 'code') . '_snippet', 'severity' => 'critical',
                     'description' => sprintf('%s snippet "%s" contains suspicious code', $s['source'] ?? 'Code', $s['title'] ?? ''),
-                    'details' => ['preview' => substr((string) ($s['code'] ?? ''), 0, 300)]];
+                    'details' => ['preview' => substr((string) ($s['code'] ?? ''), 0, 200)]];
                 break;
             }
         }
@@ -209,7 +209,7 @@ class ScannerEngine
         if (($posts['spam_keyword_count'] ?? 0) > 5) {
             $f[] = ['type' => 'spam_keyword_posts', 'severity' => ($posts['spam_keyword_count'] > 100 ? 'critical' : 'high'),
                 'description' => sprintf('%s posts with spam keywords detected', number_format((int) $posts['spam_keyword_count'])),
-                'details' => ['sample_titles' => substr((string) ($posts['spam_sample'] ?? ''), 0, 500)]];
+                'details' => ['sample_titles' => substr((string) ($posts['spam_sample'] ?? ''), 0, 200)]];
         }
 
         // DB-level persistence
