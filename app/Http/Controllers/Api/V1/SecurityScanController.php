@@ -76,12 +76,12 @@ class SecurityScanController extends Controller
 
         // Run the scan via WP plugin API — all types go through the main endpoint with scan_type param
         if ($scanType === 'quick') {
-            $results = $lsm->runQuickScan();
+            $results = $lsm->runQuickScan($scan->id);
         } else {
             $modules = $request->input('modules')
                 ? explode(',', $request->input('modules'))
                 : null;
-            $results = $lsm->runSecurityScan($modules, $scanType);
+            $results = $lsm->runSecurityScan($modules, $scanType, $scan->id);
         }
 
         if (!$results) {

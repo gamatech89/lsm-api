@@ -501,8 +501,9 @@ class LsmService
      *
      * @param array|null $modules Specific modules to run (null = all)
      * @param string     $scanType Scan tier: 'quick', 'standard', or 'full'
+     * @param int|null   $scanId Platform-side SecurityScan id to forward to the plugin collector
      */
-    public function runSecurityScan(?array $modules = null, string $scanType = 'full'): ?array
+    public function runSecurityScan(?array $modules = null, string $scanType = 'full', ?int $scanId = null): ?array
     {
         if (!$this->isConfigured()) return null;
 
@@ -511,6 +512,9 @@ class LsmService
             $data = ['scan_type' => $scanType];
             if ($modules) {
                 $data['modules'] = implode(',', $modules);
+            }
+            if ($scanId !== null) {
+                $data['scan_id'] = $scanId;
             }
 
             $timeouts = ['quick' => 60, 'standard' => 180, 'full' => 600];
@@ -531,8 +535,10 @@ class LsmService
 
     /**
      * Run a quick security scan on the WordPress site.
+     *
+     * @param int|null $scanId Platform-side SecurityScan id to forward to the plugin collector
      */
-    public function runQuickScan(): ?array
+    public function runQuickScan(?int $scanId = null): ?array
     {
         if (!$this->isConfigured()) return null;
 
@@ -540,7 +546,7 @@ class LsmService
             $response = Http::timeout(90)
                 ->withHeaders(['X-LSM-Key' => $this->apiKey])
                 ->withOptions(['allow_redirects' => true])
-                ->get($this->baseUrl . '/security/scan/quick');
+                ->get($this->baseUrl . '/security/scan/quick', $scanId !== null ? ['scan_id' => $scanId] : []);
 
             return $this->handleResponse($response);
         } catch (\Exception $e) {
