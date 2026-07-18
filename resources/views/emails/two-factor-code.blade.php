@@ -15,9 +15,8 @@
           {{-- Logo / Header --}}
           <tr>
             <td align="center" style="padding-bottom:24px;">
-              <span style="font-size:20px;font-weight:700;color:#3b1f6e;letter-spacing:-0.5px;">
-                {{ config('app.name') }}
-              </span>
+              <img src="{{ rtrim(config('app.url'), '/') }}/images/email-logo.png" width="48" height="48" alt="Landeseiten Maintenance" style="display:block;margin:0 auto 8px;border:0;">
+              <span style="font-size:16px;font-weight:700;color:#3b1f6e;letter-spacing:-0.3px;">Landeseiten Maintenance</span>
             </td>
           </tr>
 
