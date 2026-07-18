@@ -20,3 +20,12 @@ it('renders the brand CTA color in notification emails', function () {
 
     expect(strtolower($html))->toContain('#7c3aed');
 });
+
+it('renders the logo image and branded footer', function () {
+    $project = Project::factory()->make(['id' => 7, 'name' => 'Acme']);
+    $scan = SecurityScan::factory()->make(['project_id' => 7, 'risk_level' => 'critical', 'threats_found' => 3]);
+    $html = renderMail(new MalwareDetectedNotification($project, $scan));
+    expect($html)->toContain('/images/email-logo.png')
+        ->and($html)->toContain('Landeseiten Maintenance')
+        ->and($html)->toContain('please do not reply');
+});
