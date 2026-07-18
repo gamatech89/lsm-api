@@ -50,7 +50,7 @@ class SslExpiringNotification extends Notification implements ShouldQueue
                 ? '⚠️ **Urgent:** SSL certificate expires in less than a week! Renew immediately to avoid downtime.'
                 : 'Please renew the SSL certificate before it expires to avoid security warnings.')
             ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}")
-            ->salutation('— LSM Platform');
+            ->salutation('— Landeseiten Maintenance');
     }
 
     public function toArray(object $notifiable): array

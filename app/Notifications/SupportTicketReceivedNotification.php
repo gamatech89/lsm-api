@@ -32,7 +32,7 @@ class SupportTicketReceivedNotification extends Notification implements ShouldQu
             ->line("**Subject:** {$this->ticket->subject}")
             ->line($this->ticket->message)
             ->action('View Ticket', config('app.frontend_url') . "/projects/{$this->ticket->project_id}?section=support")
-            ->salutation('— LSM Platform');
+            ->salutation('— Landeseiten Maintenance');
     }
 
     public function toArray(object $notifiable): array

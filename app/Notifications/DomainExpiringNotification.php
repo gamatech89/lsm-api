@@ -51,7 +51,7 @@ class DomainExpiringNotification extends Notification implements ShouldQueue
                 ? '⚠️ **Urgent:** the domain registration expires in less than a week! Renew immediately — an expired domain takes the site offline.'
                 : 'Please renew the domain registration before it expires.')
             ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}")
-            ->salutation('— LSM Platform');
+            ->salutation('— Landeseiten Maintenance');
     }
 
     public function toArray(object $notifiable): array

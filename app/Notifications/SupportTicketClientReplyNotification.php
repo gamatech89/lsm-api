@@ -31,7 +31,7 @@ class SupportTicketClientReplyNotification extends Notification implements Shoul
             ->line("**From:** {$this->message->author_name}")
             ->line($this->message->message)
             ->action('View Ticket', config('app.frontend_url') . "/projects/{$this->ticket->project_id}?section=support")
-            ->salutation('— LSM Platform');
+            ->salutation('— Landeseiten Maintenance');
     }
 
     public function toArray(object $notifiable): array
