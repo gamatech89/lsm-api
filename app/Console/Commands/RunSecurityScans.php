@@ -76,8 +76,8 @@ class RunSecurityScans extends Command
 
             try {
                 $results = $isQuick
-                    ? $lsm->runQuickScan()
-                    : $lsm->runSecurityScan();
+                    ? $lsm->runQuickScan($scan->id)
+                    : $lsm->runSecurityScan(null, $scanType, $scan->id);
 
                 if (!$results) {
                     $scan->update([

@@ -92,3 +92,37 @@ it('forwards the created scan id to the plugin when triggering a full scan via t
             && $request['scan_id'] === $scanId;
     });
 });
+
+it('forwards the created scan id to the plugin when the scheduled security:scan command runs a full scan', function () {
+    Http::fake([
+        '*' => Http::response(['success' => true, 'status' => 'clean', 'summary' => []], 200),
+    ]);
+
+    $project = scanForwardingProject();
+
+    $this->artisan('security:scan')->assertExitCode(0);
+
+    $scanId = \App\Models\SecurityScan::first()->id;
+
+    Http::assertSent(function ($request) use ($scanId) {
+        return str_contains($request->url(), '/security/scan')
+            && $request['scan_id'] === $scanId;
+    });
+});
+
+it('forwards the created scan id to the plugin when the scheduled security:scan command runs a quick scan', function () {
+    Http::fake([
+        '*' => Http::response(['success' => true, 'status' => 'clean', 'summary' => []], 200),
+    ]);
+
+    $project = scanForwardingProject();
+
+    $this->artisan('security:scan', ['--quick' => true])->assertExitCode(0);
+
+    $scanId = \App\Models\SecurityScan::first()->id;
+
+    Http::assertSent(function ($request) use ($scanId) {
+        return str_contains($request->url(), '/security/scan/quick')
+            && str_contains($request->url(), "scan_id={$scanId}");
+    });
+});
