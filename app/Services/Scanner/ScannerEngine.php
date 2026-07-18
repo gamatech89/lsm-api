@@ -65,9 +65,12 @@ class ScannerEngine
 
     public function entropyFindings(string $relativePath, string $content): array
     {
-        // Minified assets (.min.js/.min.css) are legitimately dense and single-lined;
-        // running entropy heuristics on them only produces false positives.
-        if (preg_match('/\.min\.(js|css)$/i', $relativePath)) {
+        // Entropy analysis targets obfuscated PHP payloads. Minified JS/CSS, hashed
+        // vendor bundles, and data-URI-laden SVGs are legitimately high-entropy
+        // regardless of filename, so restricting to PHP removes that whole class of
+        // false positives. Malicious non-PHP content is caught by signature matching.
+        $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+        if (!in_array($ext, self::PHP_EXTENSIONS, true)) {
             return [];
         }
 

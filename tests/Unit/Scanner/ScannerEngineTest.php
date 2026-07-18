@@ -58,10 +58,12 @@ it('does not flag ordinary source code', function () {
         ->toBe([]);
 });
 
-it('skips minified assets entirely (no entropy false positives)', function () {
-    // A minified bundle is one long, dense high-entropy line — legitimate, must not be flagged.
-    $line = base64_encode(random_bytes(1200)); // ~1600 chars, entropy ~6, single line
-    expect(engine()->entropyFindings('wp-content/plugins/x/assets/vendor.min.js', $line))->toBe([]);
+it('skips non-PHP assets entirely (no entropy false positives on JS/CSS/SVG)', function () {
+    // Minified/hashed JS bundles and data-laden SVGs are legitimately high-entropy.
+    $blob = base64_encode(random_bytes(1200)); // ~1600 chars, entropy ~6, single line
+    expect(engine()->entropyFindings('wp-content/plugins/wordfence/js/wordfence.1778685035.js', $blob))->toBe([]);
+    expect(engine()->entropyFindings('wp-content/uploads/2fa2.svg', $blob))->toBe([]);
+    expect(engine()->entropyFindings('wp-content/plugins/x/assets/vendor.min.js', $blob))->toBe([]);
 });
 
 it('reports a long high-entropy line as a medium warning, not a threat', function () {
