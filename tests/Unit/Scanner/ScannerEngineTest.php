@@ -24,6 +24,17 @@ it('does not flag injection-category patterns in non-php files', function () {
     expect($categories)->not->toContain('injection');
 });
 
+it('treats a bare base64_decode call as info, never a threat', function () {
+    // base64_decode() alone is ubiquitous in legitimate plugins; only the eval/assert
+    // combinations are dangerous. It must not inflate threats on a clean site.
+    $php = '<?php $x = base64' . '_decode($data);';
+    $findings = engine()->scanContent('wp-content/plugins/legit/f.php', $php);
+    $sevs = array_column($findings, 'severity');
+    expect($sevs)->toContain('info')
+        ->and($sevs)->not->toContain('high')
+        ->and($sevs)->not->toContain('critical');
+});
+
 it('returns an empty array for clean content', function () {
     expect(engine()->scanContent('wp-content/themes/t/functions.php', "<?php add_action('init', fn() => null);"))
         ->toBe([]);

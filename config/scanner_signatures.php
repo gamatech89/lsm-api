@@ -34,10 +34,16 @@ return [
             'fwrite($fp, base64_decode'     => 'Base64 file write',
         ],
         'injection' => [
-            'base64_decode('        => 'Base64 decode (PHP context)',
             'gzinflate(base64_decode(' => 'Compressed base64 payload',
             'str_rot13('            => 'ROT13 obfuscation',
             'chr(hexdec('           => 'Hex character obfuscation',
+        ],
+        // Weak indicators: extremely common in legitimate plugins/themes on their own,
+        // so recorded as informational (never a threat/warning). The dangerous
+        // combinations (eval(base64_decode(, assert(base64_decode(, gzinflate(base64_decode()
+        // are covered at critical/high in the backdoor/injection categories above.
+        'weak_indicator' => [
+            'base64_decode('        => 'Uses base64_decode() — common in legitimate code, dangerous only when paired with eval/assert',
         ],
     ],
 

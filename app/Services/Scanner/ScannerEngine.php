@@ -15,7 +15,7 @@ class ScannerEngine
         $isPhp = in_array($ext, self::PHP_EXTENSIONS, true);
 
         foreach ($this->signatures['string_patterns'] ?? [] as $category => $patterns) {
-            if ($category === 'injection' && !$isPhp) {
+            if (($category === 'injection' || $category === 'weak_indicator') && !$isPhp) {
                 continue;
             }
             foreach ($patterns as $pattern => $description) {
@@ -58,6 +58,7 @@ class ScannerEngine
             'backdoor', 'shell', 'known_malware' => 'critical',
             'file_operation', 'injection', 'data_theft', 'seo_spam' => 'high',
             'obfuscation' => 'medium',
+            'weak_indicator' => 'info',
             default => 'low',
         };
     }
