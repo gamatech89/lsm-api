@@ -64,14 +64,22 @@ class ScannerEngine
 
     public function entropyFindings(string $relativePath, string $content): array
     {
+        // Minified assets (.min.js/.min.css) are legitimately dense and single-lined;
+        // running entropy heuristics on them only produces false positives.
+        if (preg_match('/\.min\.(js|css)$/i', $relativePath)) {
+            return [];
+        }
+
+        // Targeted check: a long high-entropy quoted string is the classic
+        // eval("<base64 payload>") shape — keep this at high/critical.
         if (preg_match_all('/[\'"][^\'"\n]{200,}[\'"]/s', $content, $m)) {
             foreach ($m[0] as $long) {
                 $entropy = $this->shannonEntropy($long);
-                if ($entropy > 5.5) {
+                if ($entropy > 5.8) {
                     return [[
                         'file' => $relativePath,
                         'description' => sprintf('High-entropy string detected (entropy: %.2f) — likely obfuscated payload', $entropy),
-                        'severity' => $entropy > 6.0 ? 'critical' : 'high',
+                        'severity' => $entropy > 6.2 ? 'critical' : 'high',
                         'entropy' => round($entropy, 2),
                         'string_length' => strlen($long),
                         'preview' => substr($long, 0, 80) . '...',
@@ -80,15 +88,18 @@ class ScannerEngine
             }
         }
 
+        // Weaker signal: a very long high-entropy line. Legitimate files carry these
+        // too (minified bundles, theme block-patterns with embedded base64 images), so
+        // require a higher entropy floor and report as a warning (medium), not a threat.
         foreach (explode("\n", $content) as $i => $line) {
             if (strlen($line) > 1000) {
                 $entropy = $this->shannonEntropy($line);
-                if ($entropy > 5.0) {
+                if ($entropy > 5.5) {
                     return [[
                         'file' => $relativePath,
                         'line' => $i + 1,
                         'description' => sprintf('Very long line (%d chars) with high entropy (%.2f) — potential obfuscated code', strlen($line), $entropy),
-                        'severity' => 'high',
+                        'severity' => 'medium',
                         'entropy' => round($entropy, 2),
                     ]];
                 }

@@ -47,6 +47,20 @@ it('does not flag ordinary source code', function () {
         ->toBe([]);
 });
 
+it('skips minified assets entirely (no entropy false positives)', function () {
+    // A minified bundle is one long, dense high-entropy line — legitimate, must not be flagged.
+    $line = base64_encode(random_bytes(1200)); // ~1600 chars, entropy ~6, single line
+    expect(engine()->entropyFindings('wp-content/plugins/x/assets/vendor.min.js', $line))->toBe([]);
+});
+
+it('reports a long high-entropy line as a medium warning, not a threat', function () {
+    // A very long high-entropy line in a normal file is a weak signal → warning, not threat.
+    $line = base64_encode(random_bytes(1200)); // ~1600 chars, no quotes → hits the line check
+    $findings = engine()->entropyFindings('wp-content/themes/t/block-patterns.php', $line);
+    expect($findings)->not->toBeEmpty()
+        ->and($findings[0]['severity'])->toBe('medium');
+});
+
 it('flags SEO cloaking in htaccess', function () {
     $ht = "RewriteCond %{HTTP_USER_AGENT} googlebot [NC]\nRewriteRule .* /cloak.php";
     $f = engine()->scanHtaccess('.htaccess', $ht, 'example.com');
