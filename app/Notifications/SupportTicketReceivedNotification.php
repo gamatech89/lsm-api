@@ -31,7 +31,7 @@ class SupportTicketReceivedNotification extends Notification implements ShouldQu
             ->line("**From:** {$this->ticket->client_name} <{$this->ticket->client_email}>")
             ->line("**Subject:** {$this->ticket->subject}")
             ->line($this->ticket->message)
-            ->action('View Ticket', config('app.frontend_url') . "/projects/{$this->ticket->project_id}")
+            ->action('View Ticket', config('app.frontend_url') . "/projects/{$this->ticket->project_id}?section=support")
             ->salutation('— LSM Platform');
     }
 

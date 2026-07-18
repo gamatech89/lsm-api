@@ -32,7 +32,7 @@ class TodoDueDateReminderNotification extends Notification implements ShouldQueu
             ->line("**Title:** {$this->todo->title}")
             ->line("**Project:** {$this->todo->project->name}")
             ->line("**Due Date:** {$dueDate}")
-            ->action('View Project', config('app.frontend_url') . "/projects/{$this->todo->project_id}")
+            ->action('View Project', config('app.frontend_url') . "/projects/{$this->todo->project_id}?section=todos")
             ->line('Please make sure to complete it before the deadline.');
     }
 

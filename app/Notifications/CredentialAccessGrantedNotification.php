@@ -23,7 +23,7 @@ class CredentialAccessGrantedNotification extends Notification implements Should
     {
         $projectName = $this->credential->project?->name ?? 'your project';
         $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
-        $projectUrl  = $frontendUrl . '/projects/' . $this->credential->project_id . '/credentials';
+        $projectUrl  = $frontendUrl . '/projects/' . $this->credential->project_id . '?section=credentials';
 
         return (new MailMessage)
             ->subject("Credential access granted: {$this->credential->title}")
