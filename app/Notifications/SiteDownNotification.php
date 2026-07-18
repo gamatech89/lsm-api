@@ -49,7 +49,7 @@ class SiteDownNotification extends Notification implements ShouldQueue
             ->line("**Error:** {$this->errorMessage}")
             ->line("**Detected at:** " . now()->format('Y-m-d H:i:s'))
             ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}")
-            ->salutation('— LSM Platform');
+            ->salutation('— Landeseiten Maintenance');
     }
 
     public function toArray(object $notifiable): array

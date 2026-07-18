@@ -44,7 +44,7 @@ class SiteRecoveredNotification extends Notification implements ShouldQueue
             ->line("**Recovered at:** " . now()->format('Y-m-d H:i:s'))
             ->line("**Approximate downtime:** {$this->downtimeDuration}")
             ->action('View Project', config('app.frontend_url') . "/projects/{$this->project->id}")
-            ->salutation('— LSM Platform');
+            ->salutation('— Landeseiten Maintenance');
     }
 
     public function toArray(object $notifiable): array
