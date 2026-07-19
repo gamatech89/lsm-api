@@ -230,6 +230,15 @@ class AuthController extends Controller
 
         $user->update(['password' => Hash::make($validated['password'])]);
 
+        // Revoke all other tokens for security, but keep the current session's
+        // token valid so the user isn't logged out of the request they just made.
+        $currentToken = $user->currentAccessToken();
+        $tokensQuery = $user->tokens();
+        if ($currentToken && ! $currentToken instanceof \Laravel\Sanctum\TransientToken) {
+            $tokensQuery = $tokensQuery->where('id', '!=', $currentToken->id);
+        }
+        $tokensQuery->delete();
+
         return response()->json(['success' => true]);
     }
 

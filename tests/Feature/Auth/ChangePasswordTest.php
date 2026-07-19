@@ -49,3 +49,30 @@ it('requires authentication', function () {
         'password_confirmation' => 'new-password-456',
     ])->assertUnauthorized();
 });
+
+it('revokes other tokens but keeps the current session token valid after a password change', function () {
+    $user = User::factory()->create(['password' => Hash::make('old-password-123')]);
+
+    // A token issued before the change (e.g. a stolen session) should stop working.
+    $priorToken = $user->createToken('prior-device')->plainTextToken;
+
+    // The token used to make the change itself should keep working afterwards.
+    $currentToken = $user->createToken('current-device')->plainTextToken;
+
+    $response = $this->withToken($currentToken)->putJson('/api/v1/user/password', [
+        'current_password' => 'old-password-123',
+        'password' => 'new-password-456',
+        'password_confirmation' => 'new-password-456',
+    ]);
+
+    $response->assertOk()->assertJson(['success' => true]);
+
+    // The Sanctum RequestGuard caches the resolved user for the lifetime of the
+    // guard instance (see TokenExpirationTest.php), so forget guards between
+    // requests here to force each one to re-resolve its user from the token.
+    $this->app['auth']->forgetGuards();
+    $this->withToken($priorToken)->getJson('/api/v1/user')->assertUnauthorized();
+
+    $this->app['auth']->forgetGuards();
+    $this->withToken($currentToken)->getJson('/api/v1/user')->assertOk();
+});
