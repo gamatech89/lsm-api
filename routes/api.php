@@ -117,6 +117,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/logout-all', [V1\AuthController::class, 'logoutAll'])->name('logout-all');
         Route::get('/user', [V1\AuthController::class, 'user'])->name('user');
         Route::put('/user/profile', [V1\AuthController::class, 'updateProfile'])->name('user.update-profile');
+        Route::put('/user/password', [V1\AuthController::class, 'changePassword'])->name('user.change-password');
         Route::put('/user/billing', [V1\AuthController::class, 'updateBilling'])->name('user.update-billing');
         Route::post('/refresh-token', [V1\AuthController::class, 'refresh'])->name('refresh');
 

@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use App\Models\User;
 use App\Notifications\TwoFactorCodeNotification;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 
 /**
  * Authentication Controller
@@ -203,6 +205,32 @@ class AuthController extends Controller
             new UserResource($user->fresh()),
             'Profile updated successfully'
         );
+    }
+
+    /**
+     * Change the authenticated user's password (self-service).
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function changePassword(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', PasswordRule::defaults(), 'confirmed'],
+        ]);
+
+        $user = $request->user();
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => __('The provided password does not match your current password.'),
+            ]);
+        }
+
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        return response()->json(['success' => true]);
     }
 
     /**
