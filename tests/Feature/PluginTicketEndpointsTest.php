@@ -142,6 +142,25 @@ test('legacy webhook still creates tickets and now notifies staff', function () 
     Notification::assertSentTo($admin, SupportTicketReceivedNotification::class);
 });
 
+test('legacy webhook honors reported_priority', function () {
+    Project::factory()->create([
+        'url' => 'https://rp-hook.example.com',
+        'health_check_secret' => 'RP_HOOK_KEY',
+    ]);
+
+    $this->postJson('/api/v1/webhooks/support-ticket', [
+        'api_key' => 'RP_HOOK_KEY',
+        'site_url' => 'https://rp-hook.example.com',
+        'type' => 'bug',
+        'subject' => 'Webhook urgent',
+        'message' => 'x',
+        'client_email' => 'old@client.com',
+        'reported_priority' => 'urgent',
+    ])->assertCreated();
+
+    expect(SupportTicket::where('subject', 'Webhook urgent')->firstOrFail()->priority)->toBe('critical');
+});
+
 test('validation errors return JSON 422 even without an Accept header', function () {
     pluginProject('KEY_NOACCEPT');
 

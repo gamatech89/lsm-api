@@ -297,6 +297,7 @@ class SupportTicketController extends Controller
                 'client_email' => 'required|email',
                 'client_name' => 'nullable|string|max:255',
                 'problem_page' => 'nullable|string|max:500',
+                'reported_priority' => 'nullable|in:normal,high,urgent',
             ]);
 
             // Find project by site URL and API key. The secret is encrypted at
@@ -334,13 +335,18 @@ class SupportTicketController extends Controller
                 return $this->errorResponse('Project not found or invalid API key', 404);
             }
 
-            // Determine priority based on type
-            $priority = 'medium';
-            if ($validated['type'] === 'urgent') {
-                $priority = 'critical';
-            } elseif ($validated['type'] === 'bug') {
-                $priority = 'high';
-            }
+            // Client-reported priority seeds the severity; fall back to
+            // deriving it from the ticket type (older plugin builds).
+            $priority = match ($validated['reported_priority'] ?? null) {
+                'urgent' => 'critical',
+                'high' => 'high',
+                'normal' => 'medium',
+                default => match ($validated['type']) {
+                    'urgent' => 'critical',
+                    'bug' => 'high',
+                    default => 'medium',
+                },
+            };
 
             // Create the ticket
             $ticket = SupportTicket::create([
