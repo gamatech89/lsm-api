@@ -153,3 +153,38 @@ test('validation errors return JSON 422 even without an Accept header', function
     $response->assertStatus(422);
     expect($response->json('errors'))->not->toBeNull();
 });
+
+test('reported_priority seeds the ticket severity', function () {
+    pluginProject('KEY_RP');
+
+    foreach (['normal' => 'medium', 'high' => 'high', 'urgent' => 'critical'] as $reported => $expected) {
+        $this->post('/api/v1/plugin/support-tickets', [
+            'type' => 'bug',
+            'subject' => "RP {$reported}",
+            'message' => 'x',
+            'client_email' => 'c@e.com',
+            'reported_priority' => $reported,
+        ], ['X-LSM-Key' => 'KEY_RP', 'Accept' => 'application/json'])->assertCreated();
+
+        expect(SupportTicket::where('subject', "RP {$reported}")->firstOrFail()->priority)->toBe($expected);
+    }
+});
+
+test('without reported_priority, severity still derives from type', function () {
+    pluginProject('KEY_FALLBACK');
+
+    $this->post('/api/v1/plugin/support-tickets', [
+        'type' => 'bug', 'subject' => 'Fallback bug', 'message' => 'x', 'client_email' => 'c@e.com',
+    ], ['X-LSM-Key' => 'KEY_FALLBACK', 'Accept' => 'application/json'])->assertCreated();
+
+    expect(SupportTicket::where('subject', 'Fallback bug')->firstOrFail()->priority)->toBe('high');
+});
+
+test('rejects an invalid reported_priority', function () {
+    pluginProject('KEY_BADRP');
+
+    $this->post('/api/v1/plugin/support-tickets', [
+        'type' => 'bug', 'subject' => 'bad', 'message' => 'x', 'client_email' => 'c@e.com',
+        'reported_priority' => 'sofort',
+    ], ['X-LSM-Key' => 'KEY_BADRP', 'Accept' => 'application/json'])->assertStatus(422);
+});

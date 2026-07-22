@@ -94,12 +94,21 @@ class PluginTicketController extends Controller
             'client_email' => 'required|email',
             'client_name' => 'nullable|string|max:255',
             'problem_page' => 'nullable|string|max:500',
+            'reported_priority' => 'nullable|in:normal,high,urgent',
         ], SupportTicketAttachmentService::rules()));
 
-        $priority = match ($validated['type']) {
+        // The client can report urgency directly; it seeds the staff-owned
+        // severity (staff can re-triage later). Older plugins omit it — fall
+        // back to deriving severity from the ticket type.
+        $priority = match ($validated['reported_priority'] ?? null) {
             'urgent' => 'critical',
-            'bug' => 'high',
-            default => 'medium',
+            'high' => 'high',
+            'normal' => 'medium',
+            default => match ($validated['type']) {
+                'urgent' => 'critical',
+                'bug' => 'high',
+                default => 'medium',
+            },
         };
 
         $ticket = SupportTicket::create([
