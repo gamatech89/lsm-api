@@ -41,7 +41,7 @@ class TimeEntryPolicy
         // Managers can view entries on projects they manage
         if ($user->role === 'manager') {
             $project = $timeEntry->project;
-            return $project && $project->managers->contains('id', $user->id);
+            return $project && $project->isManagedBy($user);
         }
 
         return false;
@@ -67,7 +67,7 @@ class TimeEntryPolicy
             // Managers can update entries on their projects
             if ($user->role === 'manager') {
                 $project = $timeEntry->project;
-                return $project && $project->managers->contains('id', $user->id);
+                return $project && $project->isManagedBy($user);
             }
             return false;
         }
@@ -102,7 +102,7 @@ class TimeEntryPolicy
     {
         if ($user->role === 'manager') {
             $project = $timeEntry->project;
-            return $project && $project->managers->contains('id', $user->id);
+            return $project && $project->isManagedBy($user);
         }
 
         return false;

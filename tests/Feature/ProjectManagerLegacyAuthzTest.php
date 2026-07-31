@@ -31,6 +31,12 @@ test('a manager assigned only via legacy manager_id can create credentials', fun
     $this->actingAs($manager)
         ->postJson("/api/v1/projects/{$project->id}/credentials", validCredentialPayload())
         ->assertStatus(201);
+
+    $this->assertDatabaseHas('credentials', [
+        'project_id' => $project->id,
+        'title' => 'Prod DB',
+        'type' => 'database',
+    ]);
 });
 
 test('a manager assigned only via legacy manager_id can update the project', function () {
@@ -50,6 +56,12 @@ test('a manager assigned via the pivot can still create credentials', function (
     $this->actingAs($manager)
         ->postJson("/api/v1/projects/{$project->id}/credentials", validCredentialPayload())
         ->assertStatus(201);
+
+    $this->assertDatabaseHas('credentials', [
+        'project_id' => $project->id,
+        'title' => 'Prod DB',
+        'type' => 'database',
+    ]);
 });
 
 test('a developer can never create credentials', function () {

@@ -38,7 +38,7 @@ class CredentialPolicy
         $project = $credential->project;
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
 
         if ($user->role === 'developer') {
@@ -66,7 +66,7 @@ class CredentialPolicy
     public function update(User $user, Credential $credential): bool
     {
         if ($user->role === 'manager') {
-            return $credential->project->managers->contains('id', $user->id);
+            return $credential->project->isManagedBy($user);
         }
 
         return false;
@@ -79,7 +79,7 @@ class CredentialPolicy
     public function delete(User $user, Credential $credential): bool
     {
         if ($user->role === 'manager') {
-            return $credential->project->managers->contains('id', $user->id);
+            return $credential->project->isManagedBy($user);
         }
 
         return false;
@@ -108,7 +108,7 @@ class CredentialPolicy
     public function share(User $user, Credential $credential): bool
     {
         if ($user->role === 'manager') {
-            return $credential->project->managers->contains('id', $user->id);
+            return $credential->project->isManagedBy($user);
         }
 
         return false;
@@ -121,7 +121,7 @@ class CredentialPolicy
     public function manageAccess(User $user, Credential $credential): bool
     {
         if ($user->role === 'manager') {
-            return $credential->project->managers->contains('id', $user->id);
+            return $credential->project->isManagedBy($user);
         }
 
         return false;

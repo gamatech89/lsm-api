@@ -182,6 +182,21 @@ class Project extends Model
     }
 
     /**
+     * Determine whether the given user manages this project.
+     *
+     * Accepts BOTH the legacy single manager_id column AND the
+     * project_manager pivot. This is the single source of truth for
+     * manager membership: every manager-membership check platform-wide
+     * (policies, MCP tools, controllers) must use this method instead of
+     * checking the pivot or the column directly.
+     */
+    public function isManagedBy(User $user): bool
+    {
+        return $this->manager_id === $user->id
+            || $this->managers()->where('user_id', $user->id)->exists();
+    }
+
+    /**
      * Get the developer assigned to the project (legacy single developer).
      */
     public function developer(): BelongsTo

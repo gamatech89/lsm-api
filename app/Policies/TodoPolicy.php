@@ -48,7 +48,7 @@ class TodoPolicy
         }
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
         
         if ($user->role === 'developer') {
@@ -73,7 +73,7 @@ class TodoPolicy
         $project = $todo->project;
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
         
         if ($user->role === 'developer') {
@@ -98,7 +98,7 @@ class TodoPolicy
         $project = $todo->project;
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
         
         return false;

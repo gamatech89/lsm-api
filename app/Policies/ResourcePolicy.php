@@ -48,7 +48,7 @@ class ResourcePolicy
         }
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
         
         if ($user->role === 'developer') {
@@ -71,7 +71,7 @@ class ResourcePolicy
         $project = $resource->project;
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
         
         if ($user->role === 'developer') {
@@ -94,7 +94,7 @@ class ResourcePolicy
         $project = $resource->project;
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $project->isManagedBy($user);
         }
         
         return false;

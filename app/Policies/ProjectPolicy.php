@@ -35,8 +35,7 @@ class ProjectPolicy
     public function view(User $user, Project $project): bool
     {
         if ($user->role === 'manager') {
-            return $project->manager_id === $user->id
-                || $project->managers()->where('user_id', $user->id)->exists();
+            return $project->isManagedBy($user);
         }
 
         if ($user->role === 'developer') {
@@ -58,13 +57,12 @@ class ProjectPolicy
 
     /**
      * Determine whether the user manages the project.
-     * Checks both the legacy single manager_id column and the many-to-many
-     * project_manager pivot, mirroring view().
+     * Delegates to Project::isManagedBy(), the platform-wide source of truth
+     * (legacy manager_id column OR project_manager pivot).
      */
     private function managesProject(User $user, Project $project): bool
     {
-        return $project->manager_id === $user->id
-            || $project->managers()->where('user_id', $user->id)->exists();
+        return $project->isManagedBy($user);
     }
 
     /**
