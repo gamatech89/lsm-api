@@ -36,7 +36,7 @@ class ScheduledBackupJob implements ShouldQueue
 
         // Get all projects with RMB connection
         $projects = Project::whereNotNull('health_check_secret')
-            ->where('archived', false)
+            ->where('status', '!=', 'archived')
             ->get();
 
         $backupsCreated = 0;

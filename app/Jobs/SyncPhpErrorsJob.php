@@ -54,7 +54,7 @@ class SyncPhpErrorsJob implements ShouldQueue
     private function syncErrorsForAllProjects(): void
     {
         $projects = Project::whereNotNull('health_check_secret')
-            ->where('archived', false)
+            ->where('status', '!=', 'archived')
             ->get();
 
         Log::info("SyncPhpErrorsJob: Syncing errors for {$projects->count()} projects");
