@@ -217,7 +217,8 @@ class ProjectController extends Controller
         // Extract relationship arrays before creating project
         $tagIds = $validated['tag_ids'] ?? [];
         $developerIds = $validated['developer_ids'] ?? [];
-        $managerIds = $validated['manager_ids'] ?? [];
+        // Normalise to a 0-indexed list — a keyed array would make $managerIds[0] null
+        $managerIds = array_values($validated['manager_ids'] ?? []);
         $addMaintenanceTodos = $validated['add_maintenance_todos'] ?? false;
         unset($validated['tag_ids'], $validated['developer_ids'], $validated['manager_ids'], $validated['add_maintenance_todos']);
 
@@ -305,6 +306,11 @@ class ProjectController extends Controller
         $tagIds = $validated['tag_ids'] ?? null;
         $developerIds = $validated['developer_ids'] ?? null;
         $managerIds = $validated['manager_ids'] ?? null;
+        if (is_array($managerIds)) {
+            // Normalise to a 0-indexed list — a keyed array would make $managerIds[0] null
+            // (null must stay null: it means "manager_ids not provided")
+            $managerIds = array_values($managerIds);
+        }
         unset($validated['tag_ids'], $validated['developer_ids'], $validated['manager_ids']);
 
         // Role-based restrictions for assignments

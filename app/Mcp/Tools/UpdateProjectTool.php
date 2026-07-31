@@ -34,7 +34,9 @@ class UpdateProjectTool extends Tool
         }
 
         // Only admins and project managers can update projects
-        if ($user->role !== 'admin' && !$project->isManagedBy($user)) {
+        // (membership alone is not enough — a demoted user with a stale
+        // legacy manager_id must not retain write access)
+        if ($user->role !== 'admin' && !($user->role === 'manager' && $project->isManagedBy($user))) {
             return Response::error('Only admins and project managers can update projects.');
         }
 
