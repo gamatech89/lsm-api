@@ -40,7 +40,7 @@ class CompleteTodoTool extends Tool
             $canComplete = true;
         } elseif ($todo->assignee_id === $user->id) {
             $canComplete = true;
-        } elseif ($user->role === 'manager' && $todo->project->manager_id === $user->id) {
+        } elseif ($user->role === 'manager' && $todo->project->isManagedBy($user)) {
             $canComplete = true;
         }
 

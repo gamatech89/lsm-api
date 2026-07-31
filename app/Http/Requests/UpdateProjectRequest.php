@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateProjectRequest extends FormRequest
 {
@@ -41,7 +42,7 @@ class UpdateProjectRequest extends FormRequest
 
         // Only admins can change the manager
         if ($this->user()->isAdmin()) {
-            $rules['manager_id'] = 'nullable|exists:users,id';
+            $rules['manager_id'] = ['nullable', Rule::exists('users', 'id')->whereIn('role', ['admin', 'manager'])];
         }
 
         // Admins and managers can change the developer

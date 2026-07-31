@@ -64,6 +64,7 @@ class BulkAssignManagersTool extends Tool
             foreach ($projects as $project) {
                 $project->manager_id = null;
                 $project->save();
+                $project->managers()->detach();
             }
             return Response::text(
                 "✅ **Bulk PM Removal Complete**\n\n" .
@@ -95,7 +96,18 @@ class BulkAssignManagersTool extends Tool
             $managerIds = $managers->pluck('id')->toArray();
             $managerNames = $managers->pluck('name')->toArray();
         } elseif (!empty($managerIds)) {
-            $managers = User::whereIn('id', $managerIds)->get();
+            $managers = User::whereIn('id', $managerIds)
+                ->whereIn('role', ['admin', 'manager'])
+                ->get();
+
+            $rejectedIds = array_values(array_diff($managerIds, $managers->pluck('id')->all()));
+            if (!empty($rejectedIds)) {
+                return Response::error(
+                    'The following user IDs are not admins or managers (or do not exist): ' . implode(', ', $rejectedIds)
+                );
+            }
+
+            $managerIds = $managers->pluck('id')->toArray();
             $managerNames = $managers->pluck('name')->toArray();
         } else {
             // Use all managers
@@ -121,6 +133,7 @@ class BulkAssignManagersTool extends Tool
                 $randomIndex = array_rand($managerIds);
                 $project->manager_id = $managerIds[$randomIndex];
                 $project->save();
+                $project->managers()->sync([$managerIds[$randomIndex]]);
                 $assignments[$managerIds[$randomIndex]][] = $project->name;
             }
         } else {
@@ -130,6 +143,7 @@ class BulkAssignManagersTool extends Tool
                 $managerId = $managerIds[$index % $managerCount];
                 $project->manager_id = $managerId;
                 $project->save();
+                $project->managers()->sync([$managerId]);
                 $assignments[$managerId][] = $project->name;
                 $index++;
             }
@@ -189,6 +203,7 @@ class BulkAssignManagersTool extends Tool
                 $project = $projectList[$idx];
                 $project->manager_id = $managerId;
                 $project->save();
+                $project->managers()->sync([$managerId]);
                 $assignments[$managerId][] = $project->name;
             }
         }

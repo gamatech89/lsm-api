@@ -61,7 +61,7 @@ class WpLoginTool extends Tool
     private function canAccessProject($user, $project): bool
     {
         if ($user->role === 'admin') return true;
-        if ($user->role === 'manager' && $project->managers->contains('id', $user->id)) return true;
+        if ($user->role === 'manager' && $project->isManagedBy($user)) return true;
         if ($user->role === 'developer' && $project->developers->contains('id', $user->id)) return true;
         return false;
     }

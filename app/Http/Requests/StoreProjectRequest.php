@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreProjectRequest extends FormRequest
 {
@@ -29,7 +30,7 @@ class StoreProjectRequest extends FormRequest
             'notes' => 'nullable|string|max:5000',
             'health_status' => 'required|in:online,down_error,updating',
             'security_status' => 'required|in:secure,monitoring,compromised,hacked',
-            'manager_id' => 'nullable|exists:users,id',
+            'manager_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role', ['admin', 'manager'])],
             'developer_id' => 'nullable|exists:users,id',
             'project_external_id' => ['nullable', 'string', 'unique:projects,project_external_id', 'regex:/^LP\d{5}$/'],
             'hosting_provider' => 'nullable|string|max:255',

@@ -34,7 +34,9 @@ class UpdateProjectTool extends Tool
         }
 
         // Only admins and project managers can update projects
-        if ($user->role !== 'admin' && !$project->managers->contains('id', $user->id)) {
+        // (membership alone is not enough — a demoted user with a stale
+        // legacy manager_id must not retain write access)
+        if ($user->role !== 'admin' && !($user->role === 'manager' && $project->isManagedBy($user))) {
             return Response::error('Only admins and project managers can update projects.');
         }
 
@@ -86,6 +88,9 @@ class UpdateProjectTool extends Tool
             $manager = User::find($input['manager_id']);
             if (!$manager) {
                 return Response::error("User with ID {$input['manager_id']} not found.");
+            }
+            if (!in_array($manager->role, ['admin', 'manager'])) {
+                return Response::error("User with ID {$input['manager_id']} is not an admin or manager.");
             }
             $project->manager_id = $input['manager_id'];
             $project->managers()->sync([$input['manager_id']]);

@@ -56,6 +56,9 @@ class CreateProjectTool extends Tool
             if (!$manager) {
                 return Response::error("Manager with ID {$input['manager_id']} not found.");
             }
+            if (!in_array($manager->role, ['admin', 'manager'])) {
+                return Response::error("User with ID {$input['manager_id']} is not an admin or manager.");
+            }
             $managerId = $manager->id;
         } elseif (!empty($input['manager_name'])) {
             $manager = User::where('name', 'like', '%' . $input['manager_name'] . '%')
