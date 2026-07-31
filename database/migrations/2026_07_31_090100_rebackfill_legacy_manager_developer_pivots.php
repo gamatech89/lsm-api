@@ -27,20 +27,15 @@ return new class extends Migration
             ->get();
 
         foreach ($projects as $project) {
-            // Check if this relationship already exists in the pivot table
-            $exists = DB::table('project_manager')
-                ->where('project_id', $project->id)
-                ->where('user_id', $project->manager_id)
-                ->exists();
-
-            if (!$exists) {
-                DB::table('project_manager')->insert([
-                    'project_id' => $project->id,
-                    'user_id' => $project->manager_id,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            // insertOrIgnore relies on the unique(project_id, user_id) index:
+            // already-present pairs (including ones attached concurrently
+            // during deploy) are skipped instead of aborting the migration.
+            DB::table('project_manager')->insertOrIgnore([
+                'project_id' => $project->id,
+                'user_id' => $project->manager_id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
 
         // Re-backfill legacy developer_id -> project_developer pivot
@@ -50,20 +45,14 @@ return new class extends Migration
             ->get();
 
         foreach ($projects as $project) {
-            // Check if this relationship already exists in the pivot table
-            $exists = DB::table('project_developer')
-                ->where('project_id', $project->id)
-                ->where('user_id', $project->developer_id)
-                ->exists();
-
-            if (!$exists) {
-                DB::table('project_developer')->insert([
-                    'project_id' => $project->id,
-                    'user_id' => $project->developer_id,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            // See note above: unique(project_id, user_id) makes this a no-op
+            // for pairs that already exist.
+            DB::table('project_developer')->insertOrIgnore([
+                'project_id' => $project->id,
+                'user_id' => $project->developer_id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 

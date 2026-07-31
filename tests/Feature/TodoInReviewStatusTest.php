@@ -49,6 +49,21 @@ test('a developer sending completed is coerced to in_review', function () {
     ]);
 });
 
+test('a developer sending status=completed directly gets 422 and the status is unchanged', function () {
+    [$project, $todo] = makeProjectWithTodo();
+    $developer = User::factory()->create(['role' => 'developer']);
+    $project->developers()->attach($developer->id);
+
+    $this->actingAs($developer)->putJson("/api/v1/todos/{$todo->id}", [
+        'status' => 'completed',
+    ])->assertStatus(422);
+
+    $this->assertDatabaseHas('todos', [
+        'id' => $todo->id,
+        'status' => 'in_progress',
+    ]);
+});
+
 test('an admin can still mark a todo completed', function () {
     [$project, $todo] = makeProjectWithTodo();
     $admin = User::factory()->create(['role' => 'admin']);
