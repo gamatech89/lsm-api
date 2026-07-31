@@ -57,13 +57,24 @@ class ProjectPolicy
     }
 
     /**
+     * Determine whether the user manages the project.
+     * Checks both the legacy single manager_id column and the many-to-many
+     * project_manager pivot, mirroring view().
+     */
+    private function managesProject(User $user, Project $project): bool
+    {
+        return $project->manager_id === $user->id
+            || $project->managers()->where('user_id', $user->id)->exists();
+    }
+
+    /**
      * Determine whether the user can update the model.
      * Managers can update their own projects, developers can update assigned projects.
      */
     public function update(User $user, Project $project): bool
     {
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $this->managesProject($user, $project);
         }
         
         if ($user->role === 'developer') {
@@ -82,7 +93,7 @@ class ProjectPolicy
     public function delete(User $user, Project $project): bool
     {
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $this->managesProject($user, $project);
         }
         
         return false;
@@ -93,7 +104,7 @@ class ProjectPolicy
      */
     public function restore(User $user, Project $project): bool
     {
-        return $user->role === 'manager' && $project->managers->contains('id', $user->id);
+        return $user->role === 'manager' && $this->managesProject($user, $project);
     }
 
     /**
@@ -116,7 +127,7 @@ class ProjectPolicy
         }
 
         if ($user->role === 'manager') {
-            return $project->managers->contains('id', $user->id);
+            return $this->managesProject($user, $project);
         }
 
         // Developers cannot manage credentials
@@ -128,6 +139,6 @@ class ProjectPolicy
      */
     public function assignTeam(User $user, Project $project): bool
     {
-        return $user->role === 'manager' && $project->managers->contains('id', $user->id);
+        return $user->role === 'manager' && $this->managesProject($user, $project);
     }
 }
