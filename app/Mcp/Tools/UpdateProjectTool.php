@@ -87,6 +87,9 @@ class UpdateProjectTool extends Tool
             if (!$manager) {
                 return Response::error("User with ID {$input['manager_id']} not found.");
             }
+            if (!in_array($manager->role, ['admin', 'manager'])) {
+                return Response::error("User with ID {$input['manager_id']} is not an admin or manager.");
+            }
             $project->manager_id = $input['manager_id'];
             $project->managers()->sync([$input['manager_id']]);
             $updates[] = "manager → {$manager->name}";

@@ -78,9 +78,9 @@ class StoreProjectRequest extends FormRequest
             'trello_link' => ['nullable', 'url', 'max:255'],
             
             // Assignments
-            'manager_id' => ['nullable', 'exists:users,id'],
+            'manager_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role', ['admin', 'manager'])],
             'manager_ids' => ['nullable', 'array'],
-            'manager_ids.*' => ['exists:users,id'],
+            'manager_ids.*' => [Rule::exists('users', 'id')->whereIn('role', ['admin', 'manager'])],
             'developer_ids' => ['nullable', 'array'],
             'developer_ids.*' => ['exists:users,id'],
             'tag_ids' => ['nullable', 'array'],

@@ -225,8 +225,9 @@ class ProjectController extends Controller
         $validated['health_status'] = $validated['health_status'] ?? 'online';
         $validated['security_status'] = $validated['security_status'] ?? 'secure';
 
-        // If manager_ids provided, also set legacy manager_id to first one
-        if (!empty($managerIds) && empty($validated['manager_id'])) {
+        // If manager_ids provided, legacy manager_id always mirrors the first one
+        // (an explicitly supplied manager_id must not diverge from the pivot)
+        if (!empty($managerIds)) {
             $validated['manager_id'] = $managerIds[0];
         }
 
@@ -333,7 +334,7 @@ class ProjectController extends Controller
                 $manager = User::find($mgrId);
                 $manager?->notify(new ProjectAssignedNotification($project, 'manager'));
             }
-        } elseif (isset($validated['manager_id']) && $validated['manager_id'] != ($oldManagerIds[0] ?? null)) {
+        } elseif (array_key_exists('manager_id', $validated) && $validated['manager_id'] != ($oldManagerIds[0] ?? null)) {
             // Legacy single manager_id update — also sync pivot
             if ($validated['manager_id']) {
                 $project->managers()->sync([$validated['manager_id']]);

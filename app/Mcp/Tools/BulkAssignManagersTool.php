@@ -64,6 +64,7 @@ class BulkAssignManagersTool extends Tool
             foreach ($projects as $project) {
                 $project->manager_id = null;
                 $project->save();
+                $project->managers()->detach();
             }
             return Response::text(
                 "✅ **Bulk PM Removal Complete**\n\n" .
