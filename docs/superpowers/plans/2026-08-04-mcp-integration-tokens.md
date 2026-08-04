@@ -604,11 +604,14 @@ null so removing the cap does not make them immortal."
 - Create: `app/Listeners/RecordTokenUsageIp.php`
 - Modify: `app/Providers/AppServiceProvider.php`
 - Modify: `app/Models/User.php`
-- Test: `tests/Feature/IntegrationTokenControllerTest.php` (first two tests only)
+- Modify: `app/Http/Controllers/Api/V1/AuthController.php` — `refresh()` (steps 6-8)
+- Test: `tests/Feature/IntegrationTokenControllerTest.php`, `tests/Feature/TokenExpirationTest.php`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `personal_access_tokens.type` (string, default `'session'`), `.created_from_ip` (nullable string), `.last_used_ip` (nullable string). `User::integrationTokens(): MorphMany` returning only `type = 'integration'` rows. Tasks 4-6 rely on all four.
+- Produces: `personal_access_tokens.type` (string, default `'session'`), `.created_from_ip` (nullable string), `.last_used_ip` (nullable string). `User::integrationTokens(): MorphMany` returning only `type = 'integration'` rows. Tasks 4-6 rely on all four. `refresh()` refuses integration tokens — Task 6 depends on that being true before it mints any.
+
+**Why `refresh()` is in this task.** Task 2's review found that `POST /api/v1/refresh-token` sits behind plain `auth:sanctum` with no ability gate, reads the presented token, deletes it, and mints a replacement hardcoded to `['*']`. Once Task 6 can issue an `mcp:read` token, its holder could trade it for a full wildcard session — and lose the integration token in the bargain, since refresh deletes what it presents. The `type` column this task adds is the discriminator that closes it, so the fix lands here, before scoped tokens exist. Ruled by the human on 2026-08-04.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -770,18 +773,120 @@ In `app/Models/User.php`, add the relation next to the other relationship method
     }
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 6: Write the failing test for the refresh gate**
 
-Run: `php artisan test tests/Feature/IntegrationTokenControllerTest.php`
-Expected: PASS, 3 tests.
+Append to `tests/Feature/TokenExpirationTest.php`:
 
-- [ ] **Step 7: Commit**
+```php
+test('refresh-token refuses an integration token', function () {
+    $user = User::factory()->create();
+    $integration = $user->createToken('mcp-client', ['mcp:read'], now()->addYear());
+    $integration->accessToken->forceFill(['type' => 'integration'])->save();
+
+    $this->withToken($integration->plainTextToken)
+        ->postJson('/api/v1/refresh-token')
+        ->assertStatus(403);
+
+    $this->app['auth']->forgetGuards();
+
+    // The integration token must survive the refusal. refresh() deletes the
+    // token it is handed, so a refusal that ran too late would revoke the very
+    // credential an MCP client depends on.
+    expect($integration->accessToken->fresh())->not->toBeNull();
+    $this->withToken($integration->plainTextToken)->getJson('/api/v1/user')->assertOk();
+});
+
+test('refresh-token carries the presented abilities into the replacement', function () {
+    $user = User::factory()->create();
+    $session = $user->createToken('web-browser', ['*'], now()->addMinutes(480));
+
+    $newToken = $this->withToken($session->plainTextToken)
+        ->postJson('/api/v1/refresh-token')
+        ->assertOk()
+        ->json('data.token');
+
+    $this->app['auth']->forgetGuards();
+
+    $replacement = \Laravel\Sanctum\PersonalAccessToken::findToken($newToken);
+    expect($replacement->abilities)->toBe(['*']);
+    expect($replacement->type)->toBe('session');
+});
+```
+
+Add `use App\Models\User;` if the file does not already import it.
+
+- [ ] **Step 7: Run the test to verify it fails**
+
+Run: `php artisan test tests/Feature/TokenExpirationTest.php`
+Expected: FAIL — refresh returns 200 for the integration token and deletes it.
+
+- [ ] **Step 8: Gate `refresh()`**
+
+Replace the body of `refresh()` in `app/Http/Controllers/Api/V1/AuthController.php`:
+
+```php
+    public function refresh(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $current = $user->currentAccessToken();
+
+        // Integration tokens are not refreshable. They carry their own long
+        // expiry and a narrow set of abilities; refreshing one would both
+        // delete the credential an MCP client is using and hand back a wider
+        // token than the caller presented. Rotate them from the UI instead.
+        if ($current->type === 'integration') {
+            return $this->forbiddenResponse(
+                'Integration tokens cannot be refreshed. Create a new one under Profil → API & Integrationen.'
+            );
+        }
+
+        $deviceName = $current->name ?? 'mobile-app';
+
+        // Carry the presented abilities forward rather than granting '*', so a
+        // refresh can never widen what the caller already held.
+        $abilities = $current->abilities ?: ['*'];
+
+        $current->delete();
+
+        $token = $user->createToken(
+            $deviceName,
+            $abilities,
+            now()->addMinutes(config('sanctum.session_expiration', 480))
+        )->plainTextToken;
+
+        return $this->successResponse([
+            'token' => $token,
+            'token_type' => 'Bearer',
+        ], 'Token refreshed');
+    }
+```
+
+`currentAccessToken()` returns a `TransientToken` for cookie/session auth, which has no `type` or `abilities` property. That path cannot reach here — `/refresh-token` is a bearer-token route — but if you find otherwise, report it rather than working around it.
+
+- [ ] **Step 9: Run the tests to verify they pass**
+
+Run: `php artisan test tests/Feature/IntegrationTokenControllerTest.php tests/Feature/TokenExpirationTest.php`
+Expected: PASS.
+
+Then the full suite:
+
+Run: `php artisan test`
+Expected: PASS, zero failures.
+
+- [ ] **Step 10: Commit**
 
 ```bash
 git add database/migrations/2026_08_04_120100_add_type_and_ip_to_personal_access_tokens.php \
         app/Listeners/RecordTokenUsageIp.php app/Providers/AppServiceProvider.php \
-        app/Models/User.php tests/Feature/IntegrationTokenControllerTest.php
-git commit -m "feat: add type and IP audit columns to personal access tokens"
+        app/Models/User.php app/Http/Controllers/Api/V1/AuthController.php \
+        tests/Feature/IntegrationTokenControllerTest.php tests/Feature/TokenExpirationTest.php
+git commit -m "feat: add type and IP audit columns, and close the refresh escalation
+
+refresh() sat behind plain auth:sanctum, deleted the token it was handed and
+minted a replacement hardcoded to ['*']. Once integration tokens exist, an
+mcp:read holder could trade up to a wildcard session and lose its own token
+doing it. Refuse integration tokens outright and carry the presented abilities
+forward instead of widening them."
 ```
 
 ---
