@@ -76,6 +76,11 @@ test('the minted token actually authenticates and outlives a session', function 
 
     $this->travel(30)->days();
 
+    // The Sanctum RequestGuard caches the resolved user for the lifetime of the
+    // guard instance (see tests/Feature/TokenExpirationTest.php). actingAs()
+    // above already resolved and cached $user on the guard, so without this the
+    // assertion below never actually consults the bearer token being tested.
+    $this->app['auth']->forgetGuards();
     $this->withToken($token)->getJson('/api/v1/user')->assertOk();
 });
 
@@ -167,6 +172,8 @@ test('a manager may mint a destructive scope', function () {
         'expires_in' => '30d',
         'password' => 'secret-pw',
     ])->assertCreated();
+
+    expect($user->integrationTokens()->first()->abilities)->toBe(['mcp:wp-destructive']);
 });
 
 test('an unknown scope is rejected', function () {
@@ -178,11 +185,29 @@ test('an unknown scope is rejected', function () {
         'expires_in' => '90d',
         'password' => 'secret-pw',
     ])->assertStatus(422)->assertJsonValidationErrors('scopes.1');
+
+    expect($user->integrationTokens()->count())->toBe(0);
+});
+
+test('a wrong password and a forbidden scope both report their own error', function () {
+    // Structurally, the after() hook keeps validating both password and
+    // scopes rather than bailing on the first failure. Pin that: an early
+    // return added later would drop one of these keys without a red test.
+    $user = User::factory()->create(['role' => 'developer', 'password' => Hash::make('secret-pw')]);
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
+        'name' => 'Both wrong',
+        'scopes' => ['mcp:wp-destructive'],
+        'expires_in' => '90d',
+        'password' => 'wrong-pw',
+    ])->assertStatus(422)->assertJsonValidationErrors(['password', 'scopes']);
+
+    expect($user->integrationTokens()->count())->toBe(0);
 });
 
 test('the index never returns a token value and never lists session tokens', function () {
     $user = User::factory()->create(['role' => 'admin', 'password' => Hash::make('secret-pw')]);
-    $user->createToken('a-session-token', ['*'], now()->addMinutes(480));
+    $user->createToken('a-session-token', ['*'], now()->addMinutes(config('sanctum.session_expiration')));
 
     $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
         'name' => 'Visible one',
@@ -226,7 +251,7 @@ test('one user cannot see or revoke another user\'s tokens', function () {
 
 test('revoking an integration token leaves the session token working', function () {
     $user = User::factory()->create(['role' => 'admin', 'password' => Hash::make('secret-pw')]);
-    $session = $user->createToken('session', ['*'], now()->addMinutes(480))->plainTextToken;
+    $session = $user->createToken('session', ['*'], now()->addMinutes(config('sanctum.session_expiration')))->plainTextToken;
 
     $created = $this->withToken($session)->postJson('/api/v1/integration-tokens', [
         'name' => 'Disposable',
@@ -264,4 +289,83 @@ test('a never-expiring token is stored with a null expiry', function () {
     ])->assertCreated();
 
     expect($user->integrationTokens()->first()->expires_at)->toBeNull();
+});
+
+test('a non-string password is rejected with 422, not a 500', function () {
+    // Laravel runs after() callbacks even when the base 'string' rule has
+    // already failed, so an array here reaches Hash::check() unless guarded.
+    $user = User::factory()->create(['role' => 'admin', 'password' => Hash::make('secret-pw')]);
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
+        'name' => 'Malformed password',
+        'scopes' => ['mcp:read'],
+        'expires_in' => '90d',
+        'password' => ['nope'],
+    ])->assertStatus(422)->assertJsonValidationErrors('password');
+
+    expect($user->integrationTokens()->count())->toBe(0);
+});
+
+test('an unauthenticated request cannot mint a token', function () {
+    $this->postJson('/api/v1/integration-tokens', [
+        'name' => 'No session',
+        'scopes' => ['mcp:read'],
+        'expires_in' => '90d',
+        'password' => 'secret-pw',
+    ])->assertStatus(401);
+});
+
+test('an un-enrolled user subject to the MFA gate cannot reach this endpoint', function () {
+    config(['auth.mfa_enforced_roles' => ['admin']]);
+
+    $user = User::factory()->create([
+        'role' => 'admin',
+        'password' => Hash::make('secret-pw'),
+        'two_factor_confirmed_at' => null,
+        'two_factor_email_enabled' => false,
+    ]);
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
+        'name' => 'Blocked by MFA gate',
+        'scopes' => ['mcp:read'],
+        'expires_in' => '90d',
+        'password' => 'secret-pw',
+    ])->assertStatus(403)->assertJsonPath('code', 'two_factor_setup_required');
+});
+
+test('the sixth mint attempt within a minute is throttled', function () {
+    $user = User::factory()->create(['role' => 'admin', 'password' => Hash::make('secret-pw')]);
+
+    $payload = fn (int $i) => [
+        'name' => "Attempt {$i}",
+        'scopes' => ['mcp:read'],
+        'expires_in' => '90d',
+        'password' => 'secret-pw',
+    ];
+
+    for ($i = 1; $i <= 5; $i++) {
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/integration-tokens', $payload($i))
+            ->assertCreated();
+    }
+
+    $this->actingAs($user, 'sanctum')
+        ->postJson('/api/v1/integration-tokens', $payload(6))
+        ->assertStatus(429);
+});
+
+test('a session token\'s id 404s on delete rather than logging the caller out', function () {
+    // integrationTokens() filters on type = 'integration'; this pins that the
+    // delete route cannot reach a session-typed row even by numeric id, so a
+    // future refactor to $request->user()->tokens()->find($id) would be
+    // caught here rather than letting a user log themselves out through this
+    // endpoint with an otherwise-green suite.
+    $user = User::factory()->create(['role' => 'admin', 'password' => Hash::make('secret-pw')]);
+    $session = $user->createToken('session', ['*'], now()->addMinutes(config('sanctum.session_expiration')));
+
+    $this->actingAs($user, 'sanctum')
+        ->deleteJson("/api/v1/integration-tokens/{$session->accessToken->id}")
+        ->assertStatus(404);
+
+    expect($session->accessToken->fresh())->not->toBeNull();
 });

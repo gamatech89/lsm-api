@@ -55,9 +55,15 @@ class StoreIntegrationTokenRequest extends FormRequest
     {
         return [
             function (Validator $validator) {
+                $password = $this->input('password');
+
                 // Step-up: a stolen session must not be enough to mint a
-                // long-lived, portfolio-wide credential.
-                if (! Hash::check($this->input('password', ''), $this->user()->password)) {
+                // long-lived, portfolio-wide credential. Guard the type first:
+                // after-callbacks still run when the base 'string' rule has
+                // already failed, and Hash::check() hands a non-string straight
+                // to password_verify(), which throws a TypeError rather than
+                // returning false — an uncaught 500 on a credential endpoint.
+                if (! is_string($password) || ! Hash::check($password, $this->user()->password)) {
                     $validator->errors()->add('password', 'The password is incorrect.');
                 }
 
@@ -77,6 +83,12 @@ class StoreIntegrationTokenRequest extends FormRequest
 
     /**
      * Absolute expiry for the requested option, or null for 'never'.
+     *
+     * 'never' is spelled out explicitly rather than falling through to
+     * 'default', so that an unrecognised value cannot silently collapse into
+     * "no expiry" — EXPIRY_OPTIONS and this match are two lists that must be
+     * edited together, and the failure direction if someone forgets must be
+     * loud, not an immortal credential reaching a 60-site WordPress portfolio.
      */
     public function expiresAt(): ?\Illuminate\Support\Carbon
     {
@@ -84,7 +96,11 @@ class StoreIntegrationTokenRequest extends FormRequest
             '30d' => now()->addDays(30),
             '90d' => now()->addDays(90),
             '1y' => now()->addYear(),
-            default => null,
+            'never' => null,
+            default => throw new \LogicException(
+                'Unhandled expires_in value: '.var_export($this->input('expires_in'), true).
+                '. EXPIRY_OPTIONS and expiresAt() must be updated together.'
+            ),
         };
     }
 
