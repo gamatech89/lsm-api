@@ -178,7 +178,6 @@ class LsmServer extends Server
         ListTagsTool::class,
 
         // WordPress — reversible
-        WpLoginTool::class,
         WpCheckConnectionsTool::class,
         WpClearCacheTool::class,
         WpEnableMaintenanceTool::class,
@@ -192,7 +191,10 @@ class LsmServer extends Server
         WpGetPhpErrorsTool::class,
         WpClearPhpErrorsTool::class,
 
-        // WordPress — destructive
+        // WordPress — destructive (by blast radius: mutation, or access/
+        // confidentiality that subsumes mutation — see each tool's
+        // requiredScope() docblock)
+        WpLoginTool::class,
         WpEmergencyTool::class,
         BulkWpActionTool::class,
         WpRestoreBackupTool::class,

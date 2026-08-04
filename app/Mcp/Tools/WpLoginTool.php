@@ -15,9 +15,19 @@ class WpLoginTool extends Tool
 {
     use HasRequiredScope;
 
+    /**
+     * Classified as mcp:wp-destructive despite mutating nothing: the login
+     * URL this tool mints logs the holder straight into wp-admin as an
+     * administrator, which subsumes every other destructive action (restore
+     * a backup, deactivate all plugins, download the database by hand). A
+     * mcp:wp token that could reach this tool would carry the whole
+     * destructive bucket in one hop, so it is classified by the access it
+     * confers, not by whether it mutates anything itself. Do not "correct"
+     * this back to mcp:wp.
+     */
     protected function requiredScope(): string
     {
-        return 'mcp:wp';
+        return 'mcp:wp-destructive';
     }
 
     protected string $name = 'wp-login';

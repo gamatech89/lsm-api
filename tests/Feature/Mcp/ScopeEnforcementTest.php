@@ -6,6 +6,7 @@ use App\Mcp\Tools\GetDashboardTool;
 use App\Mcp\Tools\ListTodosTool;
 use App\Mcp\Tools\WpEmergencyTool;
 use App\Mcp\Tools\WpRestoreBackupTool;
+use App\Models\Project;
 use App\Models\Todo;
 use App\Models\User;
 
@@ -224,28 +225,62 @@ test('the tools split across the four scopes exactly as designed', function () {
         ->countBy()
         ->all();
 
-    expect($counts)->toBe([
+    // toEqualCanonicalizing, not toBe: countBy() emits keys in first-appearance
+    // order within LsmServer::$tools, and toBe is ===, which requires identical
+    // key order for arrays. Reordering $tools would fail this on an opaque key-
+    // order diff even when the split itself is still correct.
+    expect($counts)->toEqualCanonicalizing([
         'mcp:read' => 13,
         'mcp:write' => 14,
-        'mcp:wp' => 13,
-        'mcp:wp-destructive' => 4,
+        'mcp:wp' => 12,
+        'mcp:wp-destructive' => 5,
     ]);
+});
+
+test('every destructive tool is scoped exactly mcp:wp-destructive, by name', function () {
+    // Counts alone survive a wp<->destructive swap (e.g. WpLoginTool and
+    // WpCreateBackupTool trading scopes leaves both buckets at their right
+    // size). Pin each of the five destructive tools by class name so a swap
+    // can't pass silently.
+    $destructive = [
+        \App\Mcp\Tools\WpLoginTool::class,
+        \App\Mcp\Tools\WpEmergencyTool::class,
+        \App\Mcp\Tools\BulkWpActionTool::class,
+        \App\Mcp\Tools\WpRestoreBackupTool::class,
+        \App\Mcp\Tools\WpDownloadBackupTool::class,
+    ];
+
+    foreach ($destructive as $class) {
+        $reflection = new ReflectionClass($class);
+        $method = $reflection->getMethod('requiredScope');
+        $method->setAccessible(true);
+        $scope = $method->invoke($reflection->newInstanceWithoutConstructor());
+
+        expect($scope)->toBe('mcp:wp-destructive', "{$class} should require mcp:wp-destructive, got {$scope}");
+    }
 });
 
 test('a read-only token cannot see the destructive tools', function () {
     $user = User::factory()->create(['role' => 'admin']);
     $token = $user->createToken('reader', ['mcp:read'], now()->addYear())->plainTextToken;
 
+    // per_page: matches the three siblings above — without it, toHaveCount(13)
+    // would quietly mean "13 on page one" rather than "13, full stop." Today
+    // the filtered set is 13 either way (13 < the default page size of 15),
+    // but the assertion should mean what it reads as regardless.
     $names = collect($this->withToken($token)->postJson('/mcp', [
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'tools/list',
+        'params' => ['per_page' => 50],
     ])->assertOk()->json('result.tools'))->pluck('name');
 
     expect($names)->toHaveCount(13);
+    expect($names)->not->toContain('wp-login');
     expect($names)->not->toContain('wp-emergency');
     expect($names)->not->toContain('bulk-wp-action');
     expect($names)->not->toContain('wp-restore-backup');
+    expect($names)->not->toContain('wp-download-backup');
 });
 
 test('calling a destructive tool with a read-only token is refused', function () {
@@ -267,11 +302,27 @@ test('calling a destructive tool with a read-only token is refused', function ()
 });
 
 test('a wp token does not carry destructive access', function () {
-    $user = actingWithScopes(User::factory()->create(['role' => 'admin']), ['mcp:wp']);
+    // role: developer, not admin. The sibling test above ('calling a
+    // destructive tool with a read-only token is refused') uses an admin,
+    // who passes WpRestoreBackupTool's role check unconditionally — so
+    // that test alone can't tell "assertScope() above the role check" apart
+    // from "assertScope() below it": either placement lets an admin through
+    // to whichever runs second, and both today return the scope error, so
+    // both orderings look identical from outside. A real project is created
+    // (rather than reusing a missing id) so the code actually reaches
+    // WpEmergencyTool's role check on a regressed ordering instead of
+    // short-circuiting earlier on "Project not found" — which would mask
+    // the ordering question entirely, passing either way. With a developer,
+    // who fails that role check unconditionally, moving assertScope() below
+    // it would surface "Only admins and managers can use emergency recovery
+    // tools." instead of the scope message, and toContain('mcp:wp-destructive')
+    // below would catch it.
+    $project = Project::factory()->create();
+    $user = actingWithScopes(User::factory()->create(['role' => 'developer']), ['mcp:wp']);
     app('auth')->guard()->setUser($user);
 
     $response = app()->call([new WpEmergencyTool, 'handle'], [
-        'request' => new \Laravel\Mcp\Request(['project_id' => 1, 'action' => 'status']),
+        'request' => new \Laravel\Mcp\Request(['project_id' => $project->id, 'action' => 'status']),
     ]);
 
     expect($response->isError())->toBeTrue();
