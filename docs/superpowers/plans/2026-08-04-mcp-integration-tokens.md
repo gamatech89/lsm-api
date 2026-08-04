@@ -1278,8 +1278,8 @@ test('the tools split across the four scopes exactly as designed', function () {
     expect($counts)->toBe([
         'mcp:read' => 13,
         'mcp:write' => 14,
-        'mcp:wp' => 13,
-        'mcp:wp-destructive' => 4,
+        'mcp:wp' => 12,
+        'mcp:wp-destructive' => 5,
     ]);
 });
 
@@ -1338,7 +1338,7 @@ Same three edits as Task 4, Step 4 — import, trait + scope, `handle()` guard �
 
 - [ ] **Step 4: Declare `mcp:wp` on the 13 reversible WordPress tools**
 
-`WpLoginTool`, `WpCheckConnectionsTool`, `WpClearCacheTool`, `WpEnableMaintenanceTool`, `WpDisableMaintenanceTool`, `WpGetUpdatesTool`, `WpUpdatePluginsTool`, `WpUpdateCoreTool`, `WpOptimizeDatabaseTool`, `WpCreateBackupTool`, `WpListBackupsTool`, `WpGetPhpErrorsTool`, `WpClearPhpErrorsTool`.
+`WpCheckConnectionsTool`, `WpClearCacheTool`, `WpEnableMaintenanceTool`, `WpDisableMaintenanceTool`, `WpGetUpdatesTool`, `WpUpdatePluginsTool`, `WpUpdateCoreTool`, `WpOptimizeDatabaseTool`, `WpCreateBackupTool`, `WpListBackupsTool`, `WpGetPhpErrorsTool`, `WpClearPhpErrorsTool`. (Twelve — `WpLoginTool` moved to `mcp:wp-destructive`; see below.)
 
 ```php
     use HasRequiredScope;
@@ -1349,9 +1349,21 @@ Same three edits as Task 4, Step 4 — import, trait + scope, `handle()` guard �
     }
 ```
 
-- [ ] **Step 5: Declare `mcp:wp-destructive` on the 4 high-blast-radius tools**
+- [ ] **Step 5: Declare `mcp:wp-destructive` on the 5 high-blast-radius tools**
 
-`WpEmergencyTool`, `BulkWpActionTool`, `WpRestoreBackupTool`, `WpDownloadBackupTool`.
+`WpEmergencyTool`, `BulkWpActionTool`, `WpRestoreBackupTool`, `WpDownloadBackupTool`, `WpLoginTool`.
+
+**Why `WpLoginTool` is here and not in `mcp:wp`.** It returns a plaintext URL that logs
+the holder straight into wp-admin as an administrator. Once you hold that URL you can
+restore a backup, deactivate every plugin, or download the database by hand — so an
+`mcp:wp` token containing it would subsume the entire destructive bucket and the boundary
+between the two scopes would constrain only what the *agent* does in one hop, not what the
+token can reach. Ruled by the human on 2026-08-04 after Task 5's review raised it.
+
+`WpDownloadBackupTool` mutates nothing but hands out a signed URL to a full site backup —
+database, password hashes, customer PII. It is here on confidentiality grounds. The scope
+is named for blast radius, and disclosure of that magnitude is blast radius. Do not
+"correct" either of these down to `mcp:wp`.
 
 ```php
     use HasRequiredScope;

@@ -47,8 +47,8 @@ Four abilities, grouped by blast radius rather than by feature area:
 |---|---|---|
 | `mcp:read` | 13 | Read platform state |
 | `mcp:write` | 14 | Mutate platform data (todos, time, projects, assignments) |
-| `mcp:wp` | 13 | Act on managed WordPress sites — reversible |
-| `mcp:wp-destructive` | 4 | Irreversible or fleet-wide site actions |
+| `mcp:wp` | 12 | Act on managed WordPress sites — reversible |
+| `mcp:wp-destructive` | 5 | Irreversible, fleet-wide, or session-minting |
 
 A task-tracking token — the immediate use case — is `mcp:read` + `mcp:write` and touches
 no client site.
@@ -65,13 +65,19 @@ no client site.
 `StopTimerTool`, `CreateProjectTool`, `UpdateProjectTool`, `BulkAssignDevelopersTool`,
 `BulkAssignManagersTool`, `CreateSupportTicketTool`, `GeneratePdfTool`
 
-**`mcp:wp` (13):** `WpLoginTool`, `WpCheckConnectionsTool`, `WpClearCacheTool`,
+**`mcp:wp` (12):** `WpCheckConnectionsTool`, `WpClearCacheTool`,
 `WpEnableMaintenanceTool`, `WpDisableMaintenanceTool`, `WpGetUpdatesTool`,
 `WpUpdatePluginsTool`, `WpUpdateCoreTool`, `WpOptimizeDatabaseTool`, `WpCreateBackupTool`,
 `WpListBackupsTool`, `WpGetPhpErrorsTool`, `WpClearPhpErrorsTool`
 
-**`mcp:wp-destructive` (4):** `WpEmergencyTool`, `BulkWpActionTool`, `WpRestoreBackupTool`,
-`WpDownloadBackupTool`
+**`mcp:wp-destructive` (5):** `WpEmergencyTool`, `BulkWpActionTool`, `WpRestoreBackupTool`,
+`WpDownloadBackupTool`, `WpLoginTool`
+
+`WpLoginTool` was moved here from `mcp:wp` on 2026-08-04, during implementation. It returns
+a URL that logs the holder into wp-admin as an administrator; leaving it in `mcp:wp` meant
+an `mcp:wp` token could reach every capability this bucket exists to fence off, in one
+call. `WpDownloadBackupTool` mutates nothing but discloses a full site backup — database,
+password hashes, PII — and is here on confidentiality grounds.
 
 **Resources and prompts.** All 6 resources (`lsm://dashboard`, `lsm://todos/mine`,
 `lsm://projects`, `lsm://sites/at-risk`, `lsm://time/today`, `lsm://vault`) and both prompts
@@ -100,14 +106,21 @@ A single trait, applied to every tool, resource, and prompt:
 ```php
 trait HasRequiredScope
 {
-    protected string $requiredScope = 'mcp:read';
+    abstract protected function requiredScope(): string;
 
     public function shouldRegister(): bool
     {
-        return Auth::user()?->tokenCan($this->requiredScope) ?? false;
+        return Auth::user()?->tokenCan($this->requiredScope()) ?? false;
     }
 }
 ```
+
+**Corrected during implementation:** this was originally specified as a
+`protected string $requiredScope = 'mcp:read'` property. A class that redeclares a trait
+property with a different default is a hard PHP fatal at class composition (verified on
+PHP 8.3.22), so the first non-read primitive would have prevented the app from booting.
+The abstract method also makes "every primitive states its own scope" a compile-time
+guarantee instead of a convention.
 
 Each primitive then declares one line:
 
@@ -116,7 +129,10 @@ class WpRestoreBackupTool extends Tool
 {
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:wp-destructive';
+    protected function requiredScope(): string
+    {
+        return 'mcp:wp-destructive';
+    }
 }
 ```
 
@@ -124,9 +140,18 @@ class WpRestoreBackupTool extends Tool
 client that cannot see a tool will not attempt it, reason about it, or explain its absence
 to the user. Returning an error instead would leave every tool visible and invite retries.
 
-**Defense in depth:** the trait also exposes `assertScope()`, called at the top of
-`handle()`, so a client that skips listing and calls a tool directly is still refused. The
-listing check is for ergonomics; the call check is the security boundary.
+**Corrected during implementation — this had the enforcement model backwards.** The
+original text read: "the listing check is for ergonomics; the call check is the security
+boundary." The opposite is true. `ServerContext::resolvePrimitives()` filters every
+primitive collection through `eligibleForRegistration()`, and `CallTool`,
+`ResolvesResources::resolveResource()` and `ResolvesPrompts::resolvePrompt()` all resolve
+from those filtered collections. So `shouldRegister()` is the boundary on listing *and*
+invocation: an out-of-scope tool answers `Tool [x] not found`, it is not merely hidden.
+
+`assertScope()` at the top of `handle()` remains as a backstop. It is unreachable through
+JSON-RPC in this vendor version and fires only for code that instantiates a primitive
+directly — but a vendor change to primitive resolution would make it load-bearing again.
+Neither mechanism may be removed without re-reading `ServerContext::resolvePrimitives()`.
 
 ### Backwards compatibility
 
