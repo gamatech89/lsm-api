@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
 test('the global sanctum cap is off so per-token expiry governs', function () {
@@ -46,6 +47,59 @@ test('a login token is rejected at 8 hours and 1 minute', function () {
         'email' => $user->email,
         'password' => 'password123',
         'device_name' => 'test',
+    ])->assertOk()->json('data.token');
+
+    $this->travel(481)->minutes();
+
+    $this->withToken($token)->getJson('/api/v1/user')->assertStatus(401);
+});
+
+test('a 2FA-verify token still works at 7 hours 59 minutes', function () {
+    // TwoFactorController::verify() is the mint site for every enrolled human
+    // user's session (routes/api.php puts EnsureTwoFactorEnrolled on the whole
+    // protected group), so it needs the same boundary coverage as login.
+    $user = User::factory()->create([
+        'password' => Hash::make('password123'),
+        'two_factor_email_enabled' => true,
+        'two_factor_confirmed_at' => null,
+        'two_factor_secret' => null,
+    ]);
+
+    $pendingToken = $this->postJson('/api/v1/login', [
+        'email' => $user->email,
+        'password' => 'password123',
+    ])->assertOk()->json('data.two_factor_token');
+
+    $code = Cache::get("2fa_email_code:{$pendingToken}");
+
+    $token = $this->postJson('/api/v1/two-factor/verify', [
+        'two_factor_token' => $pendingToken,
+        'code' => $code,
+    ])->assertOk()->json('data.token');
+
+    $this->travel(479)->minutes();
+
+    $this->withToken($token)->getJson('/api/v1/user')->assertOk();
+});
+
+test('a 2FA-verify token is rejected at 8 hours and 1 minute', function () {
+    $user = User::factory()->create([
+        'password' => Hash::make('password123'),
+        'two_factor_email_enabled' => true,
+        'two_factor_confirmed_at' => null,
+        'two_factor_secret' => null,
+    ]);
+
+    $pendingToken = $this->postJson('/api/v1/login', [
+        'email' => $user->email,
+        'password' => 'password123',
+    ])->assertOk()->json('data.two_factor_token');
+
+    $code = Cache::get("2fa_email_code:{$pendingToken}");
+
+    $token = $this->postJson('/api/v1/two-factor/verify', [
+        'two_factor_token' => $pendingToken,
+        'code' => $code,
     ])->assertOk()->json('data.token');
 
     $this->travel(481)->minutes();

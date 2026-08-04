@@ -59,9 +59,11 @@ return [
     /*
      * Lifetime, in minutes, of the tokens issued by login, two-factor verify
      * and refresh. Still driven by SANCTUM_EXPIRATION so deployments that set
-     * it keep working.
+     * it keep working. A set-but-blank env value casts to 0, and
+     * now()->addMinutes(0) would mint an already-expired token on every
+     * login; max(1, ...) keeps that misconfiguration from becoming an outage.
      */
-    'session_expiration' => (int) env('SANCTUM_EXPIRATION', 480), // 8 hours
+    'session_expiration' => max(1, (int) env('SANCTUM_EXPIRATION', 480)), // 8 hours
 
     /*
     |--------------------------------------------------------------------------

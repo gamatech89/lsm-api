@@ -27,13 +27,22 @@ return new class extends Migration
             ->orderBy('id')
             ->chunkById(500, function ($tokens) use ($minutes) {
                 foreach ($tokens as $token) {
-                    $issuedAt = $token->created_at
-                        ? Carbon::parse($token->created_at)
-                        : Carbon::now();
+                    if ($token->created_at) {
+                        $expiresAt = Carbon::parse($token->created_at)->addMinutes($minutes);
+                    } else {
+                        // Sanctum always populates created_at; this is defensive
+                        // only. A row of unknown age must not be widened to a
+                        // fresh 8 hours from migration time — under the old rule
+                        // Guard::isValidAccessToken() dereferences created_at
+                        // directly and would have fataled on a null here, so
+                        // treat it as already dead rather than granting it
+                        // borrowed time.
+                        $expiresAt = Carbon::now()->subMinutes($minutes);
+                    }
 
                     DB::table('personal_access_tokens')
                         ->where('id', $token->id)
-                        ->update(['expires_at' => $issuedAt->addMinutes($minutes)]);
+                        ->update(['expires_at' => $expiresAt]);
                 }
             });
     }
