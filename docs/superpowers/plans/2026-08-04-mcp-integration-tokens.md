@@ -50,7 +50,7 @@ Do **not** reach for `Sanctum::actingAs($user, ['mcp:read'])` in scope tests. It
 ### `lsm-api`
 
 **Create:**
-- `app/Mcp/Concerns/HasRequiredScope.php` — the trait: `shouldRegister()` for listing, `assertScope()` for the call boundary, `$requiredScope` default `mcp:read`.
+- `app/Mcp/Concerns/HasRequiredScope.php` — the trait: `shouldRegister()`, which is the enforcement boundary on both listing and invocation, plus `assertScope()` as a backstop, and an abstract `requiredScope(): string` each primitive must implement.
 - `app/Listeners/RecordTokenUsageIp.php` — writes `last_used_ip` on `Laravel\Sanctum\Events\TokenAuthenticated`, only when the IP changed.
 - `app/Http/Requests/StoreIntegrationTokenRequest.php` — validation, scope allow-list, role gate, step-up password rule.
 - `app/Http/Controllers/Api/V1/IntegrationTokenController.php` — index/store/destroy, filtered to `type = integration` and `Auth::id()`.
@@ -903,7 +903,7 @@ forward instead of widening them."
 **Interfaces:**
 - Consumes: `App\Mcp\Servers\LsmServer` from Task 1.
 - Produces:
-  - `App\Mcp\Concerns\HasRequiredScope` — `public function shouldRegister(): bool`, `protected function assertScope(): ?\Laravel\Mcp\Response`, `protected string $requiredScope` (default `'mcp:read'`).
+  - `App\Mcp\Concerns\HasRequiredScope` — `public function shouldRegister(): bool`, `protected function assertScope(): ?\Laravel\Mcp\Response`, `abstract protected function requiredScope(): string`.
   - `actingWithScopes(User $user, array $scopes): User` in `tests/Pest.php` — attaches a real `PersonalAccessToken` and returns the user. Tasks 5-6 do not use it; Task 5's tests use HTTP tokens directly.
 
 - [ ] **Step 1: Write the failing test**
@@ -1063,9 +1063,18 @@ use Laravel\Mcp\Response;
  * prompts/list. A client that cannot see a tool will not try it, reason about
  * it, or explain its absence — which is the point.
  *
- * That is ergonomics, not security. assertScope() at the top of handle() is the
- * boundary: a client that skips listing and calls the method directly is still
- * refused.
+ * That filter is also the security boundary, not just ergonomics.
+ * ServerContext::resolvePrimitives() runs every primitive collection through
+ * eligibleForRegistration(), and CallTool, ResolvesResources and ResolvesPrompts
+ * all resolve from those filtered collections — so an out-of-scope primitive is
+ * not merely hidden, it does not exist for tools/call, resources/read or
+ * prompts/get either. Removing shouldRegister() removes enforcement entirely.
+ *
+ * assertScope() is a backstop, not the boundary. It is unreachable through
+ * JSON-RPC in this vendor version and fires only for code that instantiates the
+ * primitive and calls handle() directly. Keep it: a vendor change to primitive
+ * resolution would make it load-bearing again. Do not remove either mechanism
+ * without re-reading ServerContext::resolvePrimitives().
  *
  * Abilities intersect with the caller's role, they never widen it. Every tool
  * keeps its own Auth::user() role checks.
@@ -1075,7 +1084,7 @@ trait HasRequiredScope
     /**
      * The token ability required to see and call this primitive.
      */
-    protected string $requiredScope = 'mcp:read';
+    abstract protected function requiredScope(): string;
 
     public function shouldRegister(): bool
     {
@@ -1088,7 +1097,7 @@ trait HasRequiredScope
      */
     protected function tokenHasRequiredScope(): bool
     {
-        return Auth::user()?->tokenCan($this->requiredScope) ?? false;
+        return Auth::user()?->tokenCan($this->requiredScope()) ?? false;
     }
 
     /**
@@ -1102,7 +1111,7 @@ trait HasRequiredScope
         }
 
         return Response::error(
-            "This token lacks the required scope: {$this->requiredScope}. "
+            "This token lacks the required scope: {$this->requiredScope()}. "
             . 'Create a token with that scope under Profil → API & Integrationen.'
         );
     }
@@ -1126,7 +1135,10 @@ class GetDashboardTool extends Tool
 {
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:read';
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
 
     protected string $name = 'get-dashboard';
 ```
@@ -1144,7 +1156,7 @@ And make `handle()` check first:
         // … existing body unchanged
 ```
 
-`mcp:read` is the trait's default, so the explicit `protected string $requiredScope` line is redundant here — write it anyway. Every primitive stating its own scope means a reader never has to know what the default is, and a future change to the default cannot silently reclassify 13 tools.
+The trait has no default: `requiredScope()` is abstract, so every primitive must state its own scope or fail loudly at class composition. That is deliberate. An earlier draft of this plan used a `protected string $requiredScope` property with an `'mcp:read'` default; that is a hard PHP fatal the moment a class declares a different value (verified on PHP 8.3.22), which Task 5 would have hit on its first `mcp:write` tool.
 
 - [ ] **Step 5: Apply it to the 6 resources and 2 prompts**
 
@@ -1193,7 +1205,31 @@ unaffected."
 
 **Interfaces:**
 - Consumes: `HasRequiredScope` from Task 4.
-- Produces: every one of the 44 tools declares a `$requiredScope`. Task 6's validation allow-list must match these four strings exactly.
+- Produces: every one of the 44 tools implements `requiredScope(): string`. Task 6's validation allow-list must match these four strings exactly.
+
+> **Corrected after Task 4's review.** This task originally told you to declare a
+> `protected string $requiredScope = '…';` property on each class. **Do not.** The trait
+> declares `abstract protected function requiredScope(): string;`, and a class that
+> redeclares a trait *property* with a different default is a hard PHP fatal at class
+> composition — verified on PHP 8.3.22:
+> `Fatal error: WriteTool and T define the same property ($requiredScope) … the definition
+> differs and is considered incompatible`. Not a test failure. The app would not boot.
+> The abstract method has the property the pattern was reaching for anyway: a primitive
+> that forgets to declare its scope fails loudly at composition rather than silently
+> inheriting read level.
+>
+> Task 4's review also established that `shouldRegister()` — not `assertScope()` — is the
+> enforcement boundary. `ServerContext::resolvePrimitives()` filters every primitive
+> collection through `eligibleForRegistration()`, and `CallTool`, `ResolvesResources` and
+> `ResolvesPrompts` all resolve from those filtered collections, so an out-of-scope
+> primitive is not merely hidden, it does not exist for invocation either. `assertScope()`
+> remains as a backstop for direct `handle()` calls and against a future vendor change.
+> Keep both; do not "simplify" either away.
+>
+> One more thing Task 4 established that bites here: `tools/list` paginates at
+> `defaultPaginationLength = 15` (`vendor/laravel/mcp/src/Server.php:97`), with
+> `maxPaginationLength = 50`. Any test asserting over the full 44-tool surface must pass
+> `per_page: 50`, or it silently examines only the first page.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1211,12 +1247,12 @@ test('every registered tool declares a required scope', function () {
     foreach ($p->getValue($server) as $class) {
         $tool = new ReflectionClass($class);
 
-        expect($tool->hasProperty('requiredScope'))
-            ->toBeTrue("{$class} does not declare requiredScope");
+        expect($tool->hasMethod('requiredScope'))
+            ->toBeTrue("{$class} does not implement requiredScope()");
 
-        $property = $tool->getProperty('requiredScope');
-        $property->setAccessible(true);
-        $scope = $property->getValue($tool->newInstanceWithoutConstructor());
+        $method = $tool->getMethod('requiredScope');
+        $method->setAccessible(true);
+        $scope = $method->invoke($tool->newInstanceWithoutConstructor());
 
         expect($scope)->toBeIn($valid, "{$class} declares an unknown scope: {$scope}");
     }
@@ -1230,10 +1266,11 @@ test('the tools split across the four scopes exactly as designed', function () {
 
     $counts = collect($p->getValue($server))
         ->map(function (string $class) {
-            $property = (new ReflectionClass($class))->getProperty('requiredScope');
-            $property->setAccessible(true);
+            $reflection = new ReflectionClass($class);
+            $method = $reflection->getMethod('requiredScope');
+            $method->setAccessible(true);
 
-            return $property->getValue((new ReflectionClass($class))->newInstanceWithoutConstructor());
+            return $method->invoke($reflection->newInstanceWithoutConstructor());
         })
         ->countBy()
         ->all();
@@ -1282,7 +1319,7 @@ test('a wp token does not carry destructive access', function () {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `php artisan test tests/Feature/Mcp/ScopeEnforcementTest.php`
-Expected: FAIL — 31 tools have no `requiredScope`, and the count map shows `mcp:read => 13` with the rest missing.
+Expected: FAIL — 31 tools do not implement `requiredScope()`, and the count map shows `mcp:read => 13` with the rest missing.
 
 - [ ] **Step 3: Declare `mcp:write` on the 14 write tools**
 
@@ -1293,7 +1330,10 @@ Same three edits as Task 4, Step 4 — import, trait + scope, `handle()` guard �
 ```php
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:write';
+    protected function requiredScope(): string
+    {
+        return 'mcp:write';
+    }
 ```
 
 - [ ] **Step 4: Declare `mcp:wp` on the 13 reversible WordPress tools**
@@ -1303,7 +1343,10 @@ Same three edits as Task 4, Step 4 — import, trait + scope, `handle()` guard �
 ```php
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:wp';
+    protected function requiredScope(): string
+    {
+        return 'mcp:wp';
+    }
 ```
 
 - [ ] **Step 5: Declare `mcp:wp-destructive` on the 4 high-blast-radius tools**
@@ -1313,7 +1356,10 @@ Same three edits as Task 4, Step 4 — import, trait + scope, `handle()` guard �
 ```php
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:wp-destructive';
+    protected function requiredScope(): string
+    {
+        return 'mcp:wp-destructive';
+    }
 ```
 
 The `assertScope()` guard goes **above** each tool's existing role check, so a token that lacks the scope gets the scope message rather than leaking whether the caller's role would have been sufficient. In `WpEmergencyTool::handle()` that means inserting before line 42:
