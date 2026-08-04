@@ -130,17 +130,29 @@ class AuthController extends Controller
     public function refresh(Request $request): JsonResponse
     {
         $user = $request->user();
-        
-        // Get the device name from the current token or use default
-        $deviceName = $request->user()->currentAccessToken()->name ?? 'mobile-app';
-        
-        // Revoke current token
-        $request->user()->currentAccessToken()->delete();
-        
-        // Create new token
+        $current = $user->currentAccessToken();
+
+        // Integration tokens are not refreshable. They carry their own long
+        // expiry and a narrow set of abilities; refreshing one would both
+        // delete the credential an MCP client is using and hand back a wider
+        // token than the caller presented. Rotate them from the UI instead.
+        if ($current->type === 'integration') {
+            return $this->forbiddenResponse(
+                'Integration tokens cannot be refreshed. Create a new one under Profil → API & Integrationen.'
+            );
+        }
+
+        $deviceName = $current->name ?? 'mobile-app';
+
+        // Carry the presented abilities forward rather than granting '*', so a
+        // refresh can never widen what the caller already held.
+        $abilities = $current->abilities ?: ['*'];
+
+        $current->delete();
+
         $token = $user->createToken(
             $deviceName,
-            ['*'],
+            $abilities,
             now()->addMinutes(config('sanctum.session_expiration', 480))
         )->plainTextToken;
 

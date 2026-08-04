@@ -161,3 +161,37 @@ test('the backfill migration bounds legacy tokens that have no expiry', function
     $this->app['auth']->forgetGuards();
     $this->withToken($legacy->plainTextToken)->getJson('/api/v1/user')->assertStatus(401);
 });
+
+test('refresh-token refuses an integration token', function () {
+    $user = User::factory()->create();
+    $integration = $user->createToken('mcp-client', ['mcp:read'], now()->addYear());
+    $integration->accessToken->forceFill(['type' => 'integration'])->save();
+
+    $this->withToken($integration->plainTextToken)
+        ->postJson('/api/v1/refresh-token')
+        ->assertStatus(403);
+
+    $this->app['auth']->forgetGuards();
+
+    // The integration token must survive the refusal. refresh() deletes the
+    // token it is handed, so a refusal that ran too late would revoke the very
+    // credential an MCP client depends on.
+    expect($integration->accessToken->fresh())->not->toBeNull();
+    $this->withToken($integration->plainTextToken)->getJson('/api/v1/user')->assertOk();
+});
+
+test('refresh-token carries the presented abilities into the replacement', function () {
+    $user = User::factory()->create();
+    $session = $user->createToken('web-browser', ['*'], now()->addMinutes(480));
+
+    $newToken = $this->withToken($session->plainTextToken)
+        ->postJson('/api/v1/refresh-token')
+        ->assertOk()
+        ->json('data.token');
+
+    $this->app['auth']->forgetGuards();
+
+    $replacement = \Laravel\Sanctum\PersonalAccessToken::findToken($newToken);
+    expect($replacement->abilities)->toBe(['*']);
+    expect($replacement->type)->toBe('session');
+});

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\RecordTokenUsageIp;
 use App\Models\Invoice;
 use App\Models\TimeEntry;
 use App\Models\Timesheet;
@@ -10,10 +11,12 @@ use App\Policies\TimeEntryPolicy;
 use App\Policies\TimesheetPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Events\TokenAuthenticated;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -51,5 +54,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(TimeEntry::class, TimeEntryPolicy::class);
         Gate::policy(Timesheet::class, TimesheetPolicy::class);
         Gate::policy(Invoice::class, InvoicePolicy::class);
+
+        Event::listen(TokenAuthenticated::class, RecordTokenUsageIp::class);
     }
 }
