@@ -109,7 +109,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // =====================================================
     
     Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureTwoFactorEnrolled::class])->group(function () {
-        
+
+        // INTEGRATION TOKENS (long-lived scoped bearer tokens for MCP clients).
+        // Creation is throttled because it takes the account password.
+        Route::get('/integration-tokens', [V1\IntegrationTokenController::class, 'index'])
+            ->name('integration-tokens.index');
+        Route::post('/integration-tokens', [V1\IntegrationTokenController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('integration-tokens.store');
+        Route::delete('/integration-tokens/{id}', [V1\IntegrationTokenController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('integration-tokens.destroy');
+
         // -------------------------------------------------
         // AUTHENTICATION
         // -------------------------------------------------
