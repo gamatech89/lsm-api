@@ -6,9 +6,14 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Prompt;
 use Laravel\Mcp\Server\Prompts\Argument;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class WeeklyStatusPrompt extends Prompt
 {
+    use HasRequiredScope;
+
+    protected string $requiredScope = 'mcp:read';
+
     protected string $name = 'weekly-status';
 
     protected string $description = <<<'MARKDOWN'
@@ -18,6 +23,10 @@ class WeeklyStatusPrompt extends Prompt
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $content = <<<'PROMPT'
 Please generate a comprehensive weekly status report for my LSM (Landeseiten Maintenance) work. Use the available tools and resources to gather data.
 

@@ -9,9 +9,14 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class ListTodosTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected string $requiredScope = 'mcp:read';
+
     protected string $name = 'list-todos';
 
     protected string $description = <<<'MARKDOWN'
@@ -21,6 +26,10 @@ class ListTodosTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
         $input = $request->all();
 

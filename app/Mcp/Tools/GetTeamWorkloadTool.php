@@ -11,9 +11,14 @@ use Carbon\Carbon;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class GetTeamWorkloadTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected string $requiredScope = 'mcp:read';
+
     protected string $name = 'get-team-workload';
 
     protected string $description = <<<'MARKDOWN'
@@ -23,6 +28,10 @@ class GetTeamWorkloadTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
 
         // Only admins and managers can view team workload
