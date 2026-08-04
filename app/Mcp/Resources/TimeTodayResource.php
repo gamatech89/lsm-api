@@ -13,7 +13,10 @@ class TimeTodayResource extends Resource
 {
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:read';
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
 
     protected string $name = 'time-today';
 

@@ -193,7 +193,7 @@ test('bulk-assign-managers: by-id lookup rejects users who are not admins or man
     $developer = User::factory()->create(['role' => 'developer']);
     $project = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',
@@ -212,7 +212,7 @@ test('bulk-assign-managers: by-id lookup accepts admin-role users', function () 
     $adminManager = User::factory()->create(['role' => 'admin']);
     $project = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',

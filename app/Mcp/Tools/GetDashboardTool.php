@@ -17,7 +17,10 @@ class GetDashboardTool extends Tool
 {
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:read';
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
 
     protected string $name = 'get-dashboard';
 

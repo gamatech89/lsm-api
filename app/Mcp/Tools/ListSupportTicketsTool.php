@@ -14,7 +14,10 @@ class ListSupportTicketsTool extends Tool
 {
     use HasRequiredScope;
 
-    protected string $requiredScope = 'mcp:read';
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
 
     protected string $name = 'list-support-tickets';
 
