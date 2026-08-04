@@ -4,6 +4,8 @@ use App\Mcp\Resources\DashboardResource;
 use App\Mcp\Servers\LsmServer;
 use App\Mcp\Tools\GetDashboardTool;
 use App\Mcp\Tools\ListTodosTool;
+use App\Mcp\Tools\WpEmergencyTool;
+use App\Mcp\Tools\WpRestoreBackupTool;
 use App\Models\Todo;
 use App\Models\User;
 
@@ -181,4 +183,97 @@ test('role scoping still applies on top of an ability', function () {
         ->assertOk()
         ->assertSee('My Own Read-Scoped Todo')
         ->assertDontSee('Someone Elses Todo');
+});
+
+test('every registered tool declares a required scope', function () {
+    $reflection = new ReflectionClass(LsmServer::class);
+    $server = $reflection->newInstanceWithoutConstructor();
+    $p = $reflection->getProperty('tools');
+    $p->setAccessible(true);
+
+    $valid = ['mcp:read', 'mcp:write', 'mcp:wp', 'mcp:wp-destructive'];
+
+    foreach ($p->getValue($server) as $class) {
+        $tool = new ReflectionClass($class);
+
+        expect($tool->hasMethod('requiredScope'))
+            ->toBeTrue("{$class} does not implement requiredScope()");
+
+        $method = $tool->getMethod('requiredScope');
+        $method->setAccessible(true);
+        $scope = $method->invoke($tool->newInstanceWithoutConstructor());
+
+        expect($scope)->toBeIn($valid, "{$class} declares an unknown scope: {$scope}");
+    }
+});
+
+test('the tools split across the four scopes exactly as designed', function () {
+    $reflection = new ReflectionClass(LsmServer::class);
+    $server = $reflection->newInstanceWithoutConstructor();
+    $p = $reflection->getProperty('tools');
+    $p->setAccessible(true);
+
+    $counts = collect($p->getValue($server))
+        ->map(function (string $class) {
+            $reflection = new ReflectionClass($class);
+            $method = $reflection->getMethod('requiredScope');
+            $method->setAccessible(true);
+
+            return $method->invoke($reflection->newInstanceWithoutConstructor());
+        })
+        ->countBy()
+        ->all();
+
+    expect($counts)->toBe([
+        'mcp:read' => 13,
+        'mcp:write' => 14,
+        'mcp:wp' => 13,
+        'mcp:wp-destructive' => 4,
+    ]);
+});
+
+test('a read-only token cannot see the destructive tools', function () {
+    $user = User::factory()->create(['role' => 'admin']);
+    $token = $user->createToken('reader', ['mcp:read'], now()->addYear())->plainTextToken;
+
+    $names = collect($this->withToken($token)->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/list',
+    ])->assertOk()->json('result.tools'))->pluck('name');
+
+    expect($names)->toHaveCount(13);
+    expect($names)->not->toContain('wp-emergency');
+    expect($names)->not->toContain('bulk-wp-action');
+    expect($names)->not->toContain('wp-restore-backup');
+});
+
+test('calling a destructive tool with a read-only token is refused', function () {
+    // Per the note above ("tools/list hides read tools..."): shouldRegister()
+    // filters CallTool's routing too, so a scope-lacking token calling
+    // ->tool(WpRestoreBackupTool::class, ...) would get "Tool not found"
+    // before handle() ever runs, and the scope message would never appear.
+    // This exercises the assertScope() backstop directly instead, the same
+    // way the read-tool boundary test above does.
+    $user = actingWithScopes(User::factory()->create(['role' => 'admin']), ['mcp:read']);
+    app('auth')->guard()->setUser($user);
+
+    $response = app()->call([new WpRestoreBackupTool, 'handle'], [
+        'request' => new \Laravel\Mcp\Request(['backup_id' => 1]),
+    ]);
+
+    expect($response->isError())->toBeTrue();
+    expect((string) $response->content())->toContain('mcp:wp-destructive');
+});
+
+test('a wp token does not carry destructive access', function () {
+    $user = actingWithScopes(User::factory()->create(['role' => 'admin']), ['mcp:wp']);
+    app('auth')->guard()->setUser($user);
+
+    $response = app()->call([new WpEmergencyTool, 'handle'], [
+        'request' => new \Laravel\Mcp\Request(['project_id' => 1, 'action' => 'status']),
+    ]);
+
+    expect($response->isError())->toBeTrue();
+    expect((string) $response->content())->toContain('mcp:wp-destructive');
 });
