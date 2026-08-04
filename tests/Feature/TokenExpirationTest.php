@@ -180,7 +180,7 @@ test('refresh-token refuses an integration token', function () {
     $this->withToken($integration->plainTextToken)->getJson('/api/v1/user')->assertOk();
 });
 
-test('refresh-token carries the presented abilities into the replacement', function () {
+test('refresh-token issues a session-type replacement for a wildcard session', function () {
     $user = User::factory()->create();
     $session = $user->createToken('web-browser', ['*'], now()->addMinutes(480));
 
@@ -194,4 +194,15 @@ test('refresh-token carries the presented abilities into the replacement', funct
     $replacement = \Laravel\Sanctum\PersonalAccessToken::findToken($newToken);
     expect($replacement->abilities)->toBe(['*']);
     expect($replacement->type)->toBe('session');
+});
+
+test('refresh-token does not widen the abilities it was handed', function () {
+    $user = User::factory()->create();
+    $narrow = $user->createToken('web-browser', ['tickets:read'], now()->addMinutes(480));
+
+    $new = $this->withToken($narrow->plainTextToken)
+        ->postJson('/api/v1/refresh-token')->assertOk()->json('data.token');
+
+    $this->app['auth']->forgetGuards();
+    expect(\Laravel\Sanctum\PersonalAccessToken::findToken($new)->abilities)->toBe(['tickets:read']);
 });

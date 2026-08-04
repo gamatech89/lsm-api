@@ -132,11 +132,13 @@ class AuthController extends Controller
         $user = $request->user();
         $current = $user->currentAccessToken();
 
-        // Integration tokens are not refreshable. They carry their own long
-        // expiry and a narrow set of abilities; refreshing one would both
-        // delete the credential an MCP client is using and hand back a wider
-        // token than the caller presented. Rotate them from the UI instead.
-        if ($current->type === 'integration') {
+        // Only 'session' tokens are refreshable. This is an allowlist, not a
+        // denylist for 'integration': any type this app doesn't yet know
+        // about (future token kinds land in this same column) is refused
+        // until someone deliberately decides it should be refreshable, rather
+        // than silently regaining the refresh path by not matching a
+        // hardcoded 'integration' check.
+        if ($current->type !== 'session') {
             return $this->forbiddenResponse(
                 'Integration tokens cannot be refreshed. Create a new one under Profil → API & Integrationen.'
             );
@@ -145,8 +147,11 @@ class AuthController extends Controller
         $deviceName = $current->name ?? 'mobile-app';
 
         // Carry the presented abilities forward rather than granting '*', so a
-        // refresh can never widen what the caller already held.
-        $abilities = $current->abilities ?: ['*'];
+        // refresh can never widen what the caller already held. '??' (not
+        // '?:') so an explicit empty ability set stays empty instead of being
+        // widened to wildcard — only a genuinely absent/null abilities value
+        // (legacy rows) falls back to '*'.
+        $abilities = $current->abilities ?? ['*'];
 
         $current->delete();
 

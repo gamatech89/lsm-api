@@ -14,7 +14,7 @@ test('personal access tokens carry a type and IP audit columns', function () {
     expect($token->accessToken->fresh()->type)->toBe('session');
 });
 
-test('authenticating with a token records the calling IP once', function () {
+test('authenticating with a token records the calling IP', function () {
     $user = User::factory()->create();
     $token = $user->createToken('integration', ['*'], now()->addYear());
     $token->accessToken->forceFill(['type' => 'integration'])->save();
@@ -27,12 +27,17 @@ test('authenticating with a token records the calling IP once', function () {
     expect($token->accessToken->fresh()->last_used_ip)->toBe('203.0.113.7');
 });
 
-test('the user model exposes only integration tokens through the relation', function () {
+test('the user model exposes only integration tokens through the relation, newest first', function () {
     $user = User::factory()->create();
     $user->createToken('session-one', ['*'], now()->addMinutes(480));
 
-    $integration = $user->createToken('integration-one', ['mcp:read'], now()->addYear());
-    $integration->accessToken->forceFill(['type' => 'integration'])->save();
+    $older = $user->createToken('integration-older', ['mcp:read'], now()->addYear());
+    $older->accessToken->forceFill(['type' => 'integration', 'created_at' => now()->subDay()])->save();
 
-    expect($user->integrationTokens()->pluck('name')->all())->toBe(['integration-one']);
+    $newer = $user->createToken('integration-newer', ['mcp:read'], now()->addYear());
+    $newer->accessToken->forceFill(['type' => 'integration'])->save();
+
+    expect($user->integrationTokens()->pluck('name')->all())->toBe([
+        'integration-newer', 'integration-older',
+    ]);
 });
