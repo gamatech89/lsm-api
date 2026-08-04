@@ -124,8 +124,16 @@ test('a viewer can only mint a read scope', function () {
 });
 
 test('an unrecognised role falls back to read only, not to developer', function () {
-    // A role this class has never heard of must not inherit developer's scopes.
-    $user = User::factory()->create(['role' => 'auditor', 'password' => Hash::make('secret-pw')]);
+    // The DB enum keeps 'auditor' out of the users table, which is correct.
+    // Override the attribute in memory only: actingAs puts THIS instance on the
+    // guard, so the FormRequest sees a role ROLE_SCOPES has never heard of
+    // without the row on disk ever holding an invalid value.
+    $user = User::factory()->create([
+        'role' => 'developer',
+        'password' => Hash::make('secret-pw'),
+    ]);
+
+    $user->role = 'auditor';
 
     $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
         'name' => 'Unknown role write',
