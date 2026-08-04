@@ -1447,6 +1447,51 @@ test('a developer cannot mint a destructive scope', function () {
     expect($user->integrationTokens()->count())->toBe(0);
 });
 
+test('a viewer can only mint a read scope', function () {
+    $user = User::factory()->create(['role' => 'viewer', 'password' => Hash::make('secret-pw')]);
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
+        'name' => 'Viewer write',
+        'scopes' => ['mcp:write'],
+        'expires_in' => '90d',
+        'password' => 'secret-pw',
+    ])->assertStatus(422)->assertJsonValidationErrors('scopes');
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
+        'name' => 'Viewer read',
+        'scopes' => ['mcp:read'],
+        'expires_in' => '90d',
+        'password' => 'secret-pw',
+    ])->assertCreated();
+});
+
+test('an unrecognised role falls back to read only, not to developer', function () {
+    // A role this class has never heard of must not inherit developer's scopes.
+    $user = User::factory()->create(['role' => 'auditor', 'password' => Hash::make('secret-pw')]);
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/v1/integration-tokens', [
+        'name' => 'Unknown role write',
+        'scopes' => ['mcp:write'],
+        'expires_in' => '90d',
+        'password' => 'secret-pw',
+    ])->assertStatus(422)->assertJsonValidationErrors('scopes');
+});
+
+test('the store endpoint records the minting IP', function () {
+    $user = User::factory()->create(['role' => 'admin', 'password' => Hash::make('secret-pw')]);
+
+    $this->actingAs($user, 'sanctum')
+        ->withServerVariables(['REMOTE_ADDR' => '198.51.100.4'])
+        ->postJson('/api/v1/integration-tokens', [
+            'name' => 'Origin tracked',
+            'scopes' => ['mcp:read'],
+            'expires_in' => '90d',
+            'password' => 'secret-pw',
+        ])->assertCreated();
+
+    expect($user->integrationTokens()->first()->created_from_ip)->toBe('198.51.100.4');
+});
+
 test('a manager may mint a destructive scope', function () {
     $user = User::factory()->create(['role' => 'manager', 'password' => Hash::make('secret-pw')]);
 
@@ -1586,7 +1631,15 @@ class StoreIntegrationTokenRequest extends FormRequest
         'admin' => ['mcp:read', 'mcp:write', 'mcp:wp', 'mcp:wp-destructive'],
         'manager' => ['mcp:read', 'mcp:write', 'mcp:wp', 'mcp:wp-destructive'],
         'developer' => ['mcp:read', 'mcp:write', 'mcp:wp'],
+        'viewer' => ['mcp:read'],
     ];
+
+    /**
+     * What an unrecognised role may mint. Deliberately the narrowest set
+     * rather than a mid-tier default: a role this class has never heard of
+     * must not inherit another role's privileges by accident.
+     */
+    public const FALLBACK_SCOPES = ['mcp:read'];
 
     public const EXPIRY_OPTIONS = ['30d', '90d', '1y', 'never'];
 
@@ -1616,7 +1669,7 @@ class StoreIntegrationTokenRequest extends FormRequest
                     $validator->errors()->add('password', 'The password is incorrect.');
                 }
 
-                $allowed = self::ROLE_SCOPES[$this->user()->role] ?? self::ROLE_SCOPES['developer'];
+                $allowed = self::ROLE_SCOPES[$this->user()->role] ?? self::FALLBACK_SCOPES;
 
                 foreach ((array) $this->input('scopes', []) as $scope) {
                     if (in_array($scope, self::SCOPES, true) && ! in_array($scope, $allowed, true)) {
