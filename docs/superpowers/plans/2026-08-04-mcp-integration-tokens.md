@@ -13,6 +13,7 @@
 - **Session token behaviour must stay byte-for-byte identical.** Login, 2FA-verify and refresh tokens keep an 8-hour life. The number stays configurable through `SANCTUM_EXPIRATION`.
 - **The backfill migration ships in the same commit as `expiration => null`.** Separating them makes every pre-existing token immortal, including the admin token in `~/.claude.json`.
 - **Tests run on SQLite `:memory:`** (`phpunit.xml:26-27`). No raw MySQL SQL in migrations — this repo has been bitten before. Use driver-agnostic PHP-side data manipulation.
+- **The baseline suite is green: 263 passed, 2 skipped, 0 failed** (measured on `843c47f`, before any task ran). There are no known-failing tests to excuse. Any red test at any point is a regression you caused — stop and fix it, never explain it away.
 - **Scopes narrow, roles bound.** An ability never widens what a role may do. Every tool keeps its existing `Auth::user()` role checks unchanged.
 - **Abilities validated against the caller's role at mint time.** `mcp:wp-destructive` is admin/manager only — verified against `WpEmergencyTool.php:43`, `BulkWpActionTool.php:32`, `WpRestoreBackupTool.php:43`.
 - **Never log or return a plaintext token** anywhere except the single `POST` create response.
@@ -576,7 +577,7 @@ Expected: PASS, 7 tests.
 Then run the auth suite to prove session behaviour is unchanged:
 
 Run: `php artisan test tests/Feature/Auth/ tests/Feature/Mcp/`
-Expected: PASS. (`tests/Feature/Auth/` has five pre-existing failures from removed Breeze web routes — see the July security-pass notes. Confirm the failure list is identical before and after this change; if the count grows, stop and investigate.)
+Expected: PASS, zero failures. This is the change most likely to break session auth for the whole team — if anything in `tests/Feature/Auth/` goes red, stop and fix it before committing.
 
 - [ ] **Step 7: Commit**
 
@@ -1295,7 +1296,9 @@ test('a user can mint an integration token with the right password', function ()
     $row = $user->integrationTokens()->first();
     expect($row->name)->toBe('Claude Code — MacBook');
     expect($row->abilities)->toBe(['mcp:read', 'mcp:write']);
-    expect($row->expires_at->diffInDays(now()))->toBe(90);
+    // A window, not an exact diff: Carbon 3's diffInDays is signed and returns
+    // a float, so an equality assertion here would be quietly fragile.
+    expect($row->expires_at->isBetween(now()->addDays(89), now()->addDays(91)))->toBeTrue();
 });
 
 test('the minted token actually authenticates and outlives a session', function () {
@@ -1676,7 +1679,7 @@ Expected: PASS, 13 tests.
 Then the whole backend suite:
 
 Run: `php artisan test`
-Expected: PASS except the five pre-existing `tests/Feature/Auth/` Breeze failures. Compare against the list from Task 2, Step 6 — the set must be identical.
+Expected: PASS, zero failures. The baseline before this branch was 263 passed / 2 skipped / 0 failed; the count should now be higher and the failure count still zero.
 
 - [ ] **Step 8: Commit**
 
