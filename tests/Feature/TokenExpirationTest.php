@@ -1,38 +1,109 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
-test('sanctum tokens are configured with an 8-hour expiry by default', function () {
-    expect(config('sanctum.expiration'))->toBe(480);
+test('the global sanctum cap is off so per-token expiry governs', function () {
+    // Guard::isValidAccessToken ANDs the global cap with expires_at, so any
+    // non-null global expiration would silently cap long-lived tokens.
+    expect(config('sanctum.expiration'))->toBeNull();
+    expect(config('sanctum.session_expiration'))->toBe(480);
 });
 
 test('a fresh sanctum token authenticates', function () {
     $user = User::factory()->create();
-    $fresh = $user->createToken('fresh');
+    $fresh = $user->createToken('fresh', ['*'], now()->addMinutes(480));
 
     $this->withToken($fresh->plainTextToken)->getJson('/api/v1/user')->assertOk();
 });
 
-test('a sanctum token older than its lifetime is rejected', function () {
-    // Backdate created_at past the configured lifetime rather than travelling
-    // the clock. One request per test so the RequestGuard doesn't cache a user.
-    $user = User::factory()->create();
-    $stale = $user->createToken('stale');
-    $stale->accessToken->forceFill([
-        'created_at' => now()->subMinutes(config('sanctum.expiration') + 1),
-    ])->save();
+test('a login token still works at 7 hours 59 minutes', function () {
+    $user = User::factory()->create([
+        'password' => Hash::make('password123'),
+        'two_factor_confirmed_at' => null,
+        'two_factor_email_enabled' => false,
+    ]);
 
-    $this->withToken($stale->plainTextToken)->getJson('/api/v1/user')->assertStatus(401);
+    $token = $this->postJson('/api/v1/login', [
+        'email' => $user->email,
+        'password' => 'password123',
+        'device_name' => 'test',
+    ])->assertOk()->json('data.token');
+
+    $this->travel(479)->minutes();
+
+    $this->withToken($token)->getJson('/api/v1/user')->assertOk();
 });
 
-test('refresh-token issues a working replacement before expiry', function () {
+test('a login token is rejected at 8 hours and 1 minute', function () {
+    $user = User::factory()->create([
+        'password' => Hash::make('password123'),
+        'two_factor_confirmed_at' => null,
+        'two_factor_email_enabled' => false,
+    ]);
+
+    $token = $this->postJson('/api/v1/login', [
+        'email' => $user->email,
+        'password' => 'password123',
+        'device_name' => 'test',
+    ])->assertOk()->json('data.token');
+
+    $this->travel(481)->minutes();
+
+    $this->withToken($token)->getJson('/api/v1/user')->assertStatus(401);
+});
+
+test('refresh-token issues a replacement that also expires in 8 hours', function () {
     $user = User::factory()->create();
-    $token = $user->createToken('test')->plainTextToken;
+    $token = $user->createToken('test', ['*'], now()->addMinutes(480))->plainTextToken;
 
-    $res = $this->withToken($token)->postJson('/api/v1/refresh-token');
-    $res->assertOk();
+    $newToken = $this->withToken($token)
+        ->postJson('/api/v1/refresh-token')
+        ->assertOk()
+        ->json('data.token');
 
-    $newToken = $res->json('data.token');
     expect($newToken)->toBeString();
+
+    // The Sanctum RequestGuard caches the resolved user for the lifetime of the
+    // guard instance (see tests/Feature/Auth/ChangePasswordTest.php), so forget
+    // guards between requests here to force each one to re-resolve its user
+    // from the token actually presented.
+    $this->app['auth']->forgetGuards();
     $this->withToken($newToken)->getJson('/api/v1/user')->assertOk();
+
+    $this->travel(481)->minutes();
+    $this->app['auth']->forgetGuards();
+    $this->withToken($newToken)->getJson('/api/v1/user')->assertStatus(401);
+});
+
+test('a long-lived integration token survives well past 8 hours', function () {
+    $user = User::factory()->create();
+    $token = $user->createToken('integration', ['mcp:read'], now()->addYear())->plainTextToken;
+
+    $this->travel(24)->hours();
+
+    $this->withToken($token)->getJson('/api/v1/user')->assertOk();
+});
+
+test('the backfill migration bounds legacy tokens that have no expiry', function () {
+    $user = User::factory()->create();
+    $legacy = $user->createToken('legacy', ['*']);
+
+    // Simulate a pre-migration row: issued three days ago, no expires_at.
+    $legacy->accessToken->forceFill([
+        'expires_at' => null,
+        'created_at' => now()->subDays(3),
+    ])->save();
+
+    // A token with no expiry and no global cap would live forever.
+    $this->withToken($legacy->plainTextToken)->getJson('/api/v1/user')->assertOk();
+
+    $migration = require database_path('migrations/2026_08_04_120000_backfill_session_token_expiry.php');
+    $migration->up();
+
+    expect($legacy->accessToken->fresh()->expires_at)->not->toBeNull();
+
+    // See the note above: force the guard to re-resolve against the migrated row.
+    $this->app['auth']->forgetGuards();
+    $this->withToken($legacy->plainTextToken)->getJson('/api/v1/user')->assertStatus(401);
 });

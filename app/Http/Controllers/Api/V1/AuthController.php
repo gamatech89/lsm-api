@@ -64,9 +64,14 @@ class AuthController extends Controller
             ]);
         }
 
-        // Create a new token for the device
+        // Create a new token for the device. The expiry is explicit because the
+        // global sanctum cap is off; see config/sanctum.php.
         $deviceName = $request->device_name ?? 'mobile-app';
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $token = $user->createToken(
+            $deviceName,
+            ['*'],
+            now()->addMinutes(config('sanctum.session_expiration', 480))
+        )->plainTextToken;
 
         return $this->successResponse([
             'user' => new UserResource($user),
@@ -133,7 +138,11 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
         
         // Create new token
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $token = $user->createToken(
+            $deviceName,
+            ['*'],
+            now()->addMinutes(config('sanctum.session_expiration', 480))
+        )->plainTextToken;
 
         return $this->successResponse([
             'token' => $token,
