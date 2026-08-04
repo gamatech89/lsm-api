@@ -10,19 +10,50 @@ use App\Mcp\Resources\ProjectsResource;
 use App\Mcp\Resources\SitesAtRiskResource;
 use App\Mcp\Resources\TimeTodayResource;
 use App\Mcp\Resources\VaultResource;
+use App\Mcp\Tools\ApplyTodoTemplateTool;
+use App\Mcp\Tools\BulkAssignDevelopersTool;
+use App\Mcp\Tools\BulkAssignManagersTool;
+use App\Mcp\Tools\BulkWpActionTool;
 use App\Mcp\Tools\CompleteTodoTool;
+use App\Mcp\Tools\CreateProjectTool;
+use App\Mcp\Tools\CreateSupportTicketTool;
+use App\Mcp\Tools\CreateTimeEntryTool;
 use App\Mcp\Tools\CreateTodoTool;
+use App\Mcp\Tools\DeleteTodoTool;
+use App\Mcp\Tools\GeneratePdfTool;
 use App\Mcp\Tools\GetDashboardTool;
 use App\Mcp\Tools\GetProjectTool;
+use App\Mcp\Tools\GetTeamAvailabilityTool;
+use App\Mcp\Tools\GetTeamWorkloadTool;
+use App\Mcp\Tools\ListInvoicesTool;
 use App\Mcp\Tools\ListProjectsTool;
+use App\Mcp\Tools\ListResourcesTool;
+use App\Mcp\Tools\ListSupportTicketsTool;
+use App\Mcp\Tools\ListTagsTool;
+use App\Mcp\Tools\ListTeamTool;
+use App\Mcp\Tools\ListTimeEntriesTool;
+use App\Mcp\Tools\ListTodoTemplatesTool;
 use App\Mcp\Tools\ListTodosTool;
 use App\Mcp\Tools\StartTimerTool;
 use App\Mcp\Tools\StopTimerTool;
+use App\Mcp\Tools\UpdateProjectTool;
+use App\Mcp\Tools\UpdateTodoTool;
+use App\Mcp\Tools\WpCheckConnectionsTool;
 use App\Mcp\Tools\WpClearCacheTool;
-use App\Mcp\Tools\WpEnableMaintenanceTool;
+use App\Mcp\Tools\WpClearPhpErrorsTool;
+use App\Mcp\Tools\WpCreateBackupTool;
 use App\Mcp\Tools\WpDisableMaintenanceTool;
+use App\Mcp\Tools\WpDownloadBackupTool;
+use App\Mcp\Tools\WpEmergencyTool;
+use App\Mcp\Tools\WpEnableMaintenanceTool;
+use App\Mcp\Tools\WpGetPhpErrorsTool;
 use App\Mcp\Tools\WpGetUpdatesTool;
+use App\Mcp\Tools\WpListBackupsTool;
 use App\Mcp\Tools\WpLoginTool;
+use App\Mcp\Tools\WpOptimizeDatabaseTool;
+use App\Mcp\Tools\WpRestoreBackupTool;
+use App\Mcp\Tools\WpUpdateCoreTool;
+use App\Mcp\Tools\WpUpdatePluginsTool;
 use Laravel\Mcp\Server;
 
 class LsmServer extends Server
@@ -109,28 +140,63 @@ class LsmServer extends Server
      * @var array<int, class-string<\Laravel\Mcp\Server\Tool>>
      */
     protected array $tools = [
-        // Dashboard
+        // Dashboard & projects
         GetDashboardTool::class,
-
-        // Projects
         ListProjectsTool::class,
         GetProjectTool::class,
-
-        // WordPress Remote Actions
-        WpLoginTool::class,
-        WpClearCacheTool::class,
-        WpEnableMaintenanceTool::class,
-        WpDisableMaintenanceTool::class,
-        WpGetUpdatesTool::class,
+        CreateProjectTool::class,
+        UpdateProjectTool::class,
 
         // Todos
         ListTodosTool::class,
         CreateTodoTool::class,
+        UpdateTodoTool::class,
         CompleteTodoTool::class,
+        DeleteTodoTool::class,
+        ListTodoTemplatesTool::class,
+        ApplyTodoTemplateTool::class,
 
-        // Time Tracking
+        // Time tracking
+        ListTimeEntriesTool::class,
+        CreateTimeEntryTool::class,
         StartTimerTool::class,
         StopTimerTool::class,
+
+        // Team
+        ListTeamTool::class,
+        GetTeamWorkloadTool::class,
+        GetTeamAvailabilityTool::class,
+        BulkAssignDevelopersTool::class,
+        BulkAssignManagersTool::class,
+
+        // Billing, tickets, library, tags
+        ListInvoicesTool::class,
+        GeneratePdfTool::class,
+        ListSupportTicketsTool::class,
+        CreateSupportTicketTool::class,
+        ListResourcesTool::class,
+        ListTagsTool::class,
+
+        // WordPress — reversible
+        WpLoginTool::class,
+        WpCheckConnectionsTool::class,
+        WpClearCacheTool::class,
+        WpEnableMaintenanceTool::class,
+        WpDisableMaintenanceTool::class,
+        WpGetUpdatesTool::class,
+        WpUpdatePluginsTool::class,
+        WpUpdateCoreTool::class,
+        WpOptimizeDatabaseTool::class,
+        WpCreateBackupTool::class,
+        WpListBackupsTool::class,
+        WpGetPhpErrorsTool::class,
+        WpClearPhpErrorsTool::class,
+
+        // WordPress — destructive
+        WpEmergencyTool::class,
+        BulkWpActionTool::class,
+        WpRestoreBackupTool::class,
+        WpDownloadBackupTool::class,
     ];
 
     /**

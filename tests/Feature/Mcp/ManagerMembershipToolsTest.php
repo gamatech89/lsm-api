@@ -1,6 +1,6 @@
 <?php
 
-use App\Mcp\LsmServer;
+use App\Mcp\Servers\LsmServer;
 use App\Mcp\Tools\BulkAssignManagersTool;
 use App\Mcp\Tools\CompleteTodoTool;
 use App\Mcp\Tools\UpdateProjectTool;
