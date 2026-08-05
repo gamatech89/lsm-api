@@ -830,11 +830,17 @@ Replace the body of `refresh()` in `app/Http/Controllers/Api/V1/AuthController.p
         $user = $request->user();
         $current = $user->currentAccessToken();
 
-        // Integration tokens are not refreshable. They carry their own long
-        // expiry and a narrow set of abilities; refreshing one would both
-        // delete the credential an MCP client is using and hand back a wider
-        // token than the caller presented. Rotate them from the UI instead.
-        if ($current->type === 'integration') {
+        // Only 'session' tokens are refreshable. This is deliberately an
+        // allowlist, not a denylist for 'integration': any type this app
+        // doesn't yet know about (future token kinds land in this same
+        // column) is refused until someone deliberately decides it should be
+        // refreshable, rather than silently regaining the refresh path by
+        // not matching a hardcoded 'integration' check. Integration tokens
+        // specifically carry their own long expiry and a narrow set of
+        // abilities; refreshing one would both delete the credential an MCP
+        // client is using and hand back a wider token than the caller
+        // presented. Rotate them from the UI instead.
+        if ($current->type !== 'session') {
             return $this->forbiddenResponse(
                 'Integration tokens cannot be refreshed. Create a new one under Profil → API & Integrationen.'
             );
@@ -861,7 +867,7 @@ Replace the body of `refresh()` in `app/Http/Controllers/Api/V1/AuthController.p
     }
 ```
 
-`currentAccessToken()` returns a `TransientToken` for cookie/session auth, which has no `type` or `abilities` property. That path cannot reach here — `/refresh-token` is a bearer-token route — but if you find otherwise, report it rather than working around it.
+`currentAccessToken()` returns a `TransientToken` for cookie/session auth, which has no `type` or `abilities` property. This app's `sanctum.guard` includes `web`, and it serves an Inertia UI from the same host as the API, so this path *can* reach here via a browser session cookie — the final review round confirmed it and added a `! $current instanceof \Laravel\Sanctum\PersonalAccessToken` guard ahead of the `type` check for exactly this reason. Without it, PHP emits an undefined-property warning on `$current->type` and the comparison still evaluates true (refused), so the guard's purpose is to fail closed *quietly* rather than to change the outcome.
 
 - [ ] **Step 9: Run the tests to verify they pass**
 
@@ -1200,7 +1206,7 @@ unaffected."
 ## Task 5: The remaining three scopes
 
 **Files:**
-- Modify: 14 write tools, 13 wp tools, 4 wp-destructive tools in `app/Mcp/Tools/`
+- Modify: 14 write tools, 12 wp tools, 5 wp-destructive tools in `app/Mcp/Tools/`
 - Modify: `tests/Feature/Mcp/ScopeEnforcementTest.php`
 
 **Interfaces:**
@@ -1336,7 +1342,7 @@ Same three edits as Task 4, Step 4 — import, trait + scope, `handle()` guard �
     }
 ```
 
-- [ ] **Step 4: Declare `mcp:wp` on the 13 reversible WordPress tools**
+- [ ] **Step 4: Declare `mcp:wp` on the 12 reversible WordPress tools**
 
 `WpCheckConnectionsTool`, `WpClearCacheTool`, `WpEnableMaintenanceTool`, `WpDisableMaintenanceTool`, `WpGetUpdatesTool`, `WpUpdatePluginsTool`, `WpUpdateCoreTool`, `WpOptimizeDatabaseTool`, `WpCreateBackupTool`, `WpListBackupsTool`, `WpGetPhpErrorsTool`, `WpClearPhpErrorsTool`. (Twelve — `WpLoginTool` moved to `mcp:wp-destructive`; see below.)
 
@@ -1392,7 +1398,7 @@ The `assertScope()` guard goes **above** each tool's existing role check, so a t
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `php artisan test tests/Feature/Mcp/`
-Expected: PASS, including the 13/14/13/4 count map.
+Expected: PASS, including the 13/14/12/5 count map.
 
 - [ ] **Step 7: Commit**
 
@@ -2550,7 +2556,11 @@ Manual, and the only step that touches a real credential. **Do not run these com
 
 - [ ] **Step 1: Deploy both branches**
 
-Merge and deploy `lsm-api` first — `lsm-web` calls routes that must already exist. Run the migrations on production:
+Merge and deploy `lsm-api` first — `lsm-web` calls routes that must already exist.
+
+Deploy-window note: new application code goes live before `migrate --force` runs below. In that window, legacy `personal_access_tokens` rows with `expires_at IS NULL` are still unbounded (the backfill hasn't run yet), and `AuthController::refresh()` reads a `type` column that does not exist in the database yet either. In practice this is benign: `lsm-web`'s `useTokenRefresh.ts` calls `refresh-token` on a 7-hour interval and silently swallows any failure (the next 401 logs the user out instead), so a request landing in this window just fails closed rather than causing visible breakage. Stated here so it's a known, accepted window rather than something the next person has to rediscover.
+
+Run the migrations on production:
 
 ```bash
 php artisan migrate --force
@@ -2564,11 +2574,30 @@ php artisan tinker --execute="echo DB::table('personal_access_tokens')->whereNul
 
 Expected: `0`. Any other number means legacy tokens are now immortal — investigate before proceeding.
 
-- [ ] **Step 2: Mint a scoped replacement**
+Confirm the config this whole feature depends on actually took effect — a stale `config:cache` is the exact failure mode this branch exists to fix, reproduced silently:
+
+```bash
+php artisan config:clear && php artisan config:cache
+php artisan tinker --execute="var_dump(config('sanctum.expiration')); var_dump(config('sanctum.session_expiration'));"
+```
+
+Expected: `NULL` and `int(480)`. If `config('sanctum.expiration')` comes back `480` (or anything non-null), the old global cap is still in effect and every integration token — including the one minted in Step 3 below — will silently die at 8 hours despite every other check in this runbook passing. Do not proceed until this reads `NULL`.
+
+- [ ] **Step 2: Revoke stale tokens before minting the replacement**
+
+Do this *before* minting anything below, not after. From `/profile`, use "Überall abmelden" to revoke every token the account currently holds — this is also the only way to reach the old wildcard admin token and any leftover session tokens, since the profile page's token list only ever shows `type = 'integration'` rows (session tokens are invisible there by design, so "revoke it from the profile page if still listed" is not something you can do). "Überall abmelden" deletes *all* of the user's tokens, integration ones included, so if it is run after Step 3 it will destroy the very token just minted. Log back in afterward.
+
+If a full logout is undesirable for some reason, the equivalent targeted cleanup is:
+
+```bash
+php artisan tinker --execute="App\Models\User::where('email', '<user email>')->first()->tokens()->delete();"
+```
+
+- [ ] **Step 3: Mint a scoped replacement**
 
 In the browser: `/profile` → API & Integrationen → Token erstellen. Name it `Claude Code — MacBook`, scopes `Lesen` + `Schreiben`, 90 days. That is what the day-to-day task-tracking use case needs, and it touches no client site.
 
-- [ ] **Step 3: Swap the client over**
+- [ ] **Step 4: Swap the client over**
 
 The user runs, in their own terminal:
 
@@ -2578,9 +2607,9 @@ claude mcp add --transport http lsm https://api.wartung-ls.com/mcp \
   --header "Authorization: Bearer <the new token>" --scope user
 ```
 
-- [ ] **Step 4: Verify the new token is narrower than the old one**
+- [ ] **Step 5: Verify the new token is narrower than the old one**
 
-In a fresh session, confirm `list-todos` and `create-todo` work and that no `wp-*` tool appears in the tool list at all. The old wildcard admin token in `~/.claude.json` is now replaced; revoke any leftover session tokens from the profile page if they are still listed.
+In a fresh session, confirm `list-todos` and `create-todo` work and that no `wp-*` tool appears in the tool list at all. The old wildcard admin token in `~/.claude.json` is now replaced, and Step 2 already cleared out anything that could otherwise be mistaken for a "leftover" token.
 
 ---
 
@@ -2588,7 +2617,7 @@ In a fresh session, confirm `list-todos` and `create-todo` work and that no `wp-
 
 Checked against the spec, section by section.
 
-- **§1 Scopes** — Tasks 4-5 cover all 44 tools and the 13/14/13/4 split is asserted, not assumed. The role gate lives in `StoreIntegrationTokenRequest::ROLE_SCOPES` and is verified against the tools' own role checks.
+- **§1 Scopes** — Tasks 4-5 cover all 44 tools and the 13/14/12/5 split is asserted, not assumed. The role gate lives in `StoreIntegrationTokenRequest::ROLE_SCOPES` and is verified against the tools' own role checks.
 - **§2 Enforcement** — trait in Task 4; `shouldRegister()` hides, `assertScope()` refuses. Wildcard backwards compatibility tested.
 - **§3 Data model** — Task 3. The expiration fix is Task 2, alone, with tests either side of the 8-hour boundary and a test that the backfill actually bounds a legacy row.
 - **§4 API** — Task 6, including step-up, throttling, `type` filtering and 404-not-403 for strangers.

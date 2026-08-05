@@ -20,9 +20,18 @@ test('authenticating with a token records the calling IP', function () {
     $token = $user->createToken('integration', ['*'], now()->addYear());
     $token->accessToken->forceFill(['type' => 'integration'])->save();
 
+    // IP recording happens in RecordTokenUsageIp off Sanctum's own
+    // TokenAuthenticated event, which fires during auth:sanctum itself —
+    // before RejectIntegrationTokens ever runs — so it isn't specific to any
+    // one endpoint. Exercised against /mcp because that's where an
+    // integration token is actually allowed to reach a 200.
     $this->withToken($token->plainTextToken)
         ->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])
-        ->getJson('/api/v1/user')
+        ->postJson('/mcp', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ])
         ->assertOk();
 
     expect($token->accessToken->fresh()->last_used_ip)->toBe('203.0.113.7');
@@ -80,8 +89,16 @@ test('the minted token actually authenticates and outlives a session', function 
     // guard instance (see tests/Feature/TokenExpirationTest.php). actingAs()
     // above already resolved and cached $user on the guard, so without this the
     // assertion below never actually consults the bearer token being tested.
+    // Asserted against /mcp, not /api/v1/user: RejectIntegrationTokens now
+    // refuses integration tokens on the REST API entirely, and /mcp is the
+    // transport this token is actually meant to reach.
     $this->app['auth']->forgetGuards();
-    $this->withToken($token)->getJson('/api/v1/user')->assertOk();
+    $this->withToken($token)->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/list',
+        'params' => ['per_page' => 50],
+    ])->assertOk();
 });
 
 test('a wrong password mints nothing', function () {

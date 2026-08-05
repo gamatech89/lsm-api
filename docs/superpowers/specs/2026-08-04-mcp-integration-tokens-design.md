@@ -8,7 +8,7 @@
 
 ## Problem
 
-The MCP server (`App\Mcp\LsmServer`, 44 tools) is production-ready and live at
+The MCP server (`App\Mcp\Servers\LsmServer`, 44 tools) is production-ready and live at
 `https://api.wartung-ls.com/mcp`. The **token layer underneath it is not.** Connecting an
 MCP client today means logging in through `POST /api/v1/login` and pasting the resulting
 session token into the client. That has three defects:
@@ -250,7 +250,7 @@ tokens.
 
 ## 5. UI (`lsm-web`)
 
-A new section in `src/features/settings/pages/SettingsPage.tsx` — **"API & Integrationen"**.
+A new section in `src/features/profile/pages/ProfilePage.tsx` — **"API & Integrationen"**. (Moved from `SettingsPage.tsx` during implementation: `/settings` is wrapped in `AdminRoute`, which would make tokens admin-only and contradict this spec's own role-aware scopes and per-user isolation; `/profile` is ungated and already hosts the other personal-credential cards. See the plan's "Deviations" section.)
 
 **Token table:** name, scope badges, expiry (relative — "läuft in 87 Tagen ab"), last used
 with IP. Tokens never used show a neutral "Nie verwendet" badge — the signal for

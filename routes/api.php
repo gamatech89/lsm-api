@@ -108,7 +108,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // PROTECTED ROUTES (Requires Sanctum authentication)
     // =====================================================
     
-    Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureTwoFactorEnrolled::class])->group(function () {
+    Route::middleware(['auth:sanctum', \App\Http\Middleware\RejectIntegrationTokens::class, \App\Http\Middleware\EnsureTwoFactorEnrolled::class])->group(function () {
 
         // INTEGRATION TOKENS (long-lived scoped bearer tokens for MCP clients).
         // Creation is throttled because it takes the account password.

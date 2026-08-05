@@ -138,7 +138,16 @@ class AuthController extends Controller
         // until someone deliberately decides it should be refreshable, rather
         // than silently regaining the refresh path by not matching a
         // hardcoded 'integration' check.
-        if ($current->type !== 'session') {
+        //
+        // A TransientToken (cookie/session-guard auth — this app's Inertia UI
+        // shares the host with the API and sanctum.guard includes 'web') has
+        // no 'type' property, so a bare ->type access would warn. There is
+        // also no PersonalAccessToken row behind a TransientToken to delete
+        // and replace, so it cannot be refreshed through this rotate-the-row
+        // flow regardless — the guard below both silences the warning and
+        // documents that TransientToken deliberately falls into the same
+        // "not refreshable" branch as everything but a 'session' PAT.
+        if (! $current instanceof \Laravel\Sanctum\PersonalAccessToken || $current->type !== 'session') {
             return $this->forbiddenResponse(
                 'Integration tokens cannot be refreshed. Create a new one under Profil → API & Integrationen.'
             );

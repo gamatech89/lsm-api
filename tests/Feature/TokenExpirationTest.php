@@ -132,11 +132,21 @@ test('refresh-token issues a replacement that also expires in 8 hours', function
 
 test('a long-lived integration token survives well past 8 hours', function () {
     $user = User::factory()->create();
-    $token = $user->createToken('integration', ['mcp:read'], now()->addYear())->plainTextToken;
+    $token = $user->createToken('integration', ['mcp:read'], now()->addYear());
+    $token->accessToken->forceFill(['type' => 'integration'])->save();
 
     $this->travel(24)->hours();
 
-    $this->withToken($token)->getJson('/api/v1/user')->assertOk();
+    // Asserted against /mcp, not /api/v1/user: RejectIntegrationTokens now
+    // refuses integration tokens on the REST API entirely (see
+    // tests/Feature/RejectIntegrationTokensTest.php), so /mcp is the only
+    // transport where this token is legitimately usable.
+    $this->withToken($token->plainTextToken)->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/list',
+        'params' => ['per_page' => 50],
+    ])->assertOk();
 });
 
 test('the backfill migration bounds legacy tokens that have no expiry', function () {
@@ -167,6 +177,11 @@ test('refresh-token refuses an integration token', function () {
     $integration = $user->createToken('mcp-client', ['mcp:read'], now()->addYear());
     $integration->accessToken->forceFill(['type' => 'integration'])->save();
 
+    // /api/v1/refresh-token sits in the same protected group as every other
+    // REST route, so RejectIntegrationTokens now refuses this before the
+    // request ever reaches AuthController::refresh() — the type!=='session'
+    // check inside refresh() itself is superseded here but remains
+    // defense-in-depth for any caller that reaches the method outside HTTP.
     $this->withToken($integration->plainTextToken)
         ->postJson('/api/v1/refresh-token')
         ->assertStatus(403);
@@ -175,9 +190,14 @@ test('refresh-token refuses an integration token', function () {
 
     // The integration token must survive the refusal. refresh() deletes the
     // token it is handed, so a refusal that ran too late would revoke the very
-    // credential an MCP client depends on.
+    // credential an MCP client depends on. Checked against /mcp, since that
+    // is the only transport this token can legitimately authenticate on now.
     expect($integration->accessToken->fresh())->not->toBeNull();
-    $this->withToken($integration->plainTextToken)->getJson('/api/v1/user')->assertOk();
+    $this->withToken($integration->plainTextToken)->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/list',
+    ])->assertOk();
 });
 
 test('refresh-token issues a session-type replacement for a wildcard session', function () {
