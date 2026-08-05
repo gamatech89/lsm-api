@@ -47,7 +47,23 @@ return [
     |
     */
 
-    'expiration' => (int) env('SANCTUM_EXPIRATION', 480), // 8 hours; clients refresh before expiry
+    /*
+     * Guard::isValidAccessToken ANDs this global cap with each token's own
+     * expires_at, so a non-null value here silently caps every token no matter
+     * what expires_at says. It must stay null for integration tokens to work.
+     * Session lifetime now lives in session_expiration below, and every
+     * createToken() call site passes an explicit expires_at.
+     */
+    'expiration' => null,
+
+    /*
+     * Lifetime, in minutes, of the tokens issued by login, two-factor verify
+     * and refresh. Still driven by SANCTUM_EXPIRATION so deployments that set
+     * it keep working. A set-but-blank env value casts to 0, and
+     * now()->addMinutes(0) would mint an already-expired token on every
+     * login; max(1, ...) keeps that misconfiguration from becoming an outage.
+     */
+    'session_expiration' => max(1, (int) env('SANCTUM_EXPIRATION', 480)), // 8 hours
 
     /*
     |--------------------------------------------------------------------------

@@ -9,9 +9,17 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Resource;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class DashboardResource extends Resource
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'dashboard';
 
     protected string $uri = 'lsm://dashboard';
@@ -26,6 +34,10 @@ class DashboardResource extends Resource
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
 
         // Get accessible projects based on role

@@ -10,9 +10,17 @@ use Carbon\Carbon;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class CreateTimeEntryTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:write';
+    }
+
     protected string $name = 'create-time-entry';
 
     protected string $description = <<<'MARKDOWN'
@@ -22,6 +30,10 @@ class CreateTimeEntryTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
         $input = $request->all();
 

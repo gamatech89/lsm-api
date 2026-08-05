@@ -7,9 +7,17 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class ListTagsTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'list-tags';
 
     protected string $description = <<<'MARKDOWN'
@@ -18,6 +26,10 @@ class ListTagsTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $tags = Tag::withCount('projects')
             ->orderBy('name')
             ->get();

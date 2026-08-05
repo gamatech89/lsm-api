@@ -7,9 +7,17 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Resource;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class MyTodosResource extends Resource
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'my-todos';
 
     protected string $uri = 'lsm://todos/mine';
@@ -23,6 +31,10 @@ class MyTodosResource extends Resource
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
 
         $todos = Todo::where('assigned_to', $user->id)

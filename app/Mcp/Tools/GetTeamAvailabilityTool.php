@@ -11,9 +11,17 @@ use Carbon\Carbon;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class GetTeamAvailabilityTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'get-team-availability';
 
     protected string $description = <<<'MARKDOWN'
@@ -23,6 +31,10 @@ class GetTeamAvailabilityTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
 
         // Only admins and managers can view team availability

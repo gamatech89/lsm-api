@@ -22,7 +22,10 @@ return [
     */
     'route' => [
         'path' => '/mcp',
-        'middleware' => ['web', 'auth:sanctum'],
+
+        // No 'web' — this is a stateless API endpoint. Adding the web group
+        // would pull in session state and CSRF verification.
+        'middleware' => ['auth:sanctum'],
     ],
 
     /*

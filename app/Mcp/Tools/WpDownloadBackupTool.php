@@ -10,9 +10,24 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class WpDownloadBackupTool extends Tool
 {
+    use HasRequiredScope;
+
+    /**
+     * Classified as mcp:wp-destructive on confidentiality grounds, not
+     * mutation: this tool changes nothing, but the signed URL it hands out
+     * points at a full site backup — database, password hashes, PII and
+     * all. That is worth as much as any mutating action here. Do not
+     * "correct" this back to mcp:wp just because it's read-only.
+     */
+    protected function requiredScope(): string
+    {
+        return 'mcp:wp-destructive';
+    }
+
     protected string $name = 'wp-download-backup';
 
     protected string $description = <<<'MARKDOWN'
@@ -23,6 +38,10 @@ class WpDownloadBackupTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
         $input = $request->all();
 

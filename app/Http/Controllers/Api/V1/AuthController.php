@@ -64,9 +64,14 @@ class AuthController extends Controller
             ]);
         }
 
-        // Create a new token for the device
+        // Create a new token for the device. The expiry is explicit because the
+        // global sanctum cap is off; see config/sanctum.php.
         $deviceName = $request->device_name ?? 'mobile-app';
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $token = $user->createToken(
+            $deviceName,
+            ['*'],
+            now()->addMinutes(config('sanctum.session_expiration', 480))
+        )->plainTextToken;
 
         return $this->successResponse([
             'user' => new UserResource($user),
@@ -125,15 +130,45 @@ class AuthController extends Controller
     public function refresh(Request $request): JsonResponse
     {
         $user = $request->user();
-        
-        // Get the device name from the current token or use default
-        $deviceName = $request->user()->currentAccessToken()->name ?? 'mobile-app';
-        
-        // Revoke current token
-        $request->user()->currentAccessToken()->delete();
-        
-        // Create new token
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $current = $user->currentAccessToken();
+
+        // Only 'session' tokens are refreshable. This is an allowlist, not a
+        // denylist for 'integration': any type this app doesn't yet know
+        // about (future token kinds land in this same column) is refused
+        // until someone deliberately decides it should be refreshable, rather
+        // than silently regaining the refresh path by not matching a
+        // hardcoded 'integration' check.
+        //
+        // A TransientToken (cookie/session-guard auth — this app's Inertia UI
+        // shares the host with the API and sanctum.guard includes 'web') has
+        // no 'type' property, so a bare ->type access would warn. There is
+        // also no PersonalAccessToken row behind a TransientToken to delete
+        // and replace, so it cannot be refreshed through this rotate-the-row
+        // flow regardless — the guard below both silences the warning and
+        // documents that TransientToken deliberately falls into the same
+        // "not refreshable" branch as everything but a 'session' PAT.
+        if (! $current instanceof \Laravel\Sanctum\PersonalAccessToken || $current->type !== 'session') {
+            return $this->forbiddenResponse(
+                'Integration tokens cannot be refreshed. Create a new one under Profil → API & Integrationen.'
+            );
+        }
+
+        $deviceName = $current->name ?? 'mobile-app';
+
+        // Carry the presented abilities forward rather than granting '*', so a
+        // refresh can never widen what the caller already held. '??' (not
+        // '?:') so an explicit empty ability set stays empty instead of being
+        // widened to wildcard — only a genuinely absent/null abilities value
+        // (legacy rows) falls back to '*'.
+        $abilities = $current->abilities ?? ['*'];
+
+        $current->delete();
+
+        $token = $user->createToken(
+            $deviceName,
+            $abilities,
+            now()->addMinutes(config('sanctum.session_expiration', 480))
+        )->plainTextToken;
 
         return $this->successResponse([
             'token' => $token,

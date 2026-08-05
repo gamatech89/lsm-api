@@ -8,9 +8,17 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class ListTeamTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'list-team';
 
     protected string $description = <<<'MARKDOWN'
@@ -20,6 +28,10 @@ class ListTeamTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
         $input = $request->all();
 

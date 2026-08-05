@@ -9,9 +9,27 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class WpLoginTool extends Tool
 {
+    use HasRequiredScope;
+
+    /**
+     * Classified as mcp:wp-destructive despite mutating nothing: the login
+     * URL this tool mints logs the holder straight into wp-admin as an
+     * administrator, which subsumes every other destructive action (restore
+     * a backup, deactivate all plugins, download the database by hand). A
+     * mcp:wp token that could reach this tool would carry the whole
+     * destructive bucket in one hop, so it is classified by the access it
+     * confers, not by whether it mutates anything itself. Do not "correct"
+     * this back to mcp:wp.
+     */
+    protected function requiredScope(): string
+    {
+        return 'mcp:wp-destructive';
+    }
+
     protected string $name = 'wp-login';
 
     protected string $description = <<<'MARKDOWN'
@@ -21,6 +39,10 @@ class WpLoginTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
         $input = $request->all();
 

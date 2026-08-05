@@ -19,9 +19,13 @@ use Laravel\Mcp\Facades\Mcp;
 |
 */
 
-// Web MCP endpoint - requires Sanctum auth
-Mcp::web('/mcp', LsmServer::class)
-    ->middleware(['auth:sanctum']);
+// Single registration point for the MCP server. Previously this competed with
+// App\Providers\McpServiceProvider, which registered the same path with no
+// middleware at all — see docs/superpowers/plans/2026-08-04-mcp-integration-tokens.md.
+if (config('mcp.enabled', true)) {
+    Mcp::web(config('mcp.route.path', '/mcp'), LsmServer::class)
+        ->middleware(config('mcp.route.middleware', ['auth:sanctum']));
 
-// Local MCP endpoint (for CLI tools like Claude Desktop stdio mode)
-Mcp::local('lsm', LsmServer::class);
+    // Local stdio transport for CLI clients.
+    Mcp::local('lsm', LsmServer::class);
+}

@@ -6,9 +6,17 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class ListTodoTemplatesTool extends Tool
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'list-todo-templates';
 
     protected string $description = <<<'MARKDOWN'
@@ -18,6 +26,10 @@ class ListTodoTemplatesTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $templates = config('todo_templates', []);
 
         if (empty($templates)) {

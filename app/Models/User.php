@@ -159,4 +159,16 @@ class User extends Authenticatable
     {
         $this->notify(new ResetPasswordNotification($token));
     }
+
+    /**
+     * Long-lived tokens minted for external integrations (MCP clients).
+     * Deliberately excludes session tokens so the management UI can never
+     * list or revoke the caller's own login.
+     */
+    public function integrationTokens(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->tokens()
+            ->where('type', 'integration')
+            ->orderByDesc('created_at');
+    }
 }

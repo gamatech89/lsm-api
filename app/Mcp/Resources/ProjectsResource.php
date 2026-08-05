@@ -7,9 +7,17 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Resource;
+use App\Mcp\Concerns\HasRequiredScope;
 
 class ProjectsResource extends Resource
 {
+    use HasRequiredScope;
+
+    protected function requiredScope(): string
+    {
+        return 'mcp:read';
+    }
+
     protected string $name = 'projects';
 
     protected string $uri = 'lsm://projects';
@@ -24,6 +32,10 @@ class ProjectsResource extends Resource
 
     public function handle(Request $request): Response
     {
+        if ($denied = $this->assertScope()) {
+            return $denied;
+        }
+
         $user = Auth::user();
 
         $query = Project::with(['manager:id,name', 'tags:id,name'])

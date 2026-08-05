@@ -155,7 +155,11 @@ class TwoFactorController extends Controller
         Cache::forget($cacheKey);
 
         $deviceName = $request->device_name ?? 'web-browser';
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $token = $user->createToken(
+            $deviceName,
+            ['*'],
+            now()->addMinutes(config('sanctum.session_expiration', 480))
+        )->plainTextToken;
 
         return $this->successResponse([
             'user' => new UserResource($user),

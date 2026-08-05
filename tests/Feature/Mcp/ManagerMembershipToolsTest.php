@@ -1,6 +1,6 @@
 <?php
 
-use App\Mcp\LsmServer;
+use App\Mcp\Servers\LsmServer;
 use App\Mcp\Tools\BulkAssignManagersTool;
 use App\Mcp\Tools\CompleteTodoTool;
 use App\Mcp\Tools\UpdateProjectTool;
@@ -28,7 +28,7 @@ test('complete-todo: a pivot-only manager can complete a todo in their project',
 
     $todo = Todo::factory()->create(['project_id' => $project->id, 'status' => 'pending']);
 
-    LsmServer::actingAs($manager)
+    LsmServer::actingAs(actingWithScopes($manager, ['*']))
         ->tool(CompleteTodoTool::class, ['todo_id' => $todo->id])
         ->assertOk()
         ->assertSee('Todo Completed');
@@ -43,7 +43,7 @@ test('complete-todo: a legacy-only manager can complete a todo in their project'
 
     $todo = Todo::factory()->create(['project_id' => $project->id, 'status' => 'pending']);
 
-    LsmServer::actingAs($manager)
+    LsmServer::actingAs(actingWithScopes($manager, ['*']))
         ->tool(CompleteTodoTool::class, ['todo_id' => $todo->id])
         ->assertOk();
 
@@ -57,7 +57,7 @@ test('complete-todo: an unrelated manager is denied', function () {
 
     $todo = Todo::factory()->create(['project_id' => $project->id, 'status' => 'pending']);
 
-    LsmServer::actingAs($stranger)
+    LsmServer::actingAs(actingWithScopes($stranger, ['*']))
         ->tool(CompleteTodoTool::class, ['todo_id' => $todo->id])
         ->assertHasErrors(['You do not have permission to complete this todo.']);
 
@@ -75,7 +75,7 @@ test('update-project: a demoted developer with a stale legacy manager_id is deni
     $project = Project::factory()->create(['manager_id' => $demoted->id]);
     $originalName = $project->name;
 
-    LsmServer::actingAs($demoted)
+    LsmServer::actingAs(actingWithScopes($demoted, ['*']))
         ->tool(UpdateProjectTool::class, [
             'project_id' => $project->id,
             'name' => 'Hijacked Name',
@@ -90,7 +90,7 @@ test('update-project: a pivot-only manager can update the project', function () 
     $project = Project::factory()->create(['manager_id' => null]);
     $project->managers()->attach($manager->id);
 
-    LsmServer::actingAs($manager)
+    LsmServer::actingAs(actingWithScopes($manager, ['*']))
         ->tool(UpdateProjectTool::class, [
             'project_id' => $project->id,
             'name' => 'Renamed By Pivot Manager',
@@ -104,7 +104,7 @@ test('update-project: a legacy-only manager can update the project', function ()
     $manager = User::factory()->create(['role' => 'manager']);
     $project = Project::factory()->create(['manager_id' => $manager->id]);
 
-    LsmServer::actingAs($manager)
+    LsmServer::actingAs(actingWithScopes($manager, ['*']))
         ->tool(UpdateProjectTool::class, [
             'project_id' => $project->id,
             'name' => 'Renamed By Legacy Manager',
@@ -125,7 +125,7 @@ test('bulk-assign-managers: round-robin assign keeps legacy manager_id and pivot
     $projectA = Project::factory()->create(['manager_id' => null]);
     $projectB = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',
@@ -150,7 +150,7 @@ test('bulk-assign-managers: weighted assign keeps legacy manager_id and pivot in
     $projectA = Project::factory()->create(['manager_id' => null]);
     $projectB = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',
@@ -173,7 +173,7 @@ test('bulk-assign-managers: random assign keeps legacy manager_id and pivot in l
     $manager = User::factory()->create(['role' => 'manager']);
     $project = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',
@@ -193,7 +193,7 @@ test('bulk-assign-managers: by-id lookup rejects users who are not admins or man
     $developer = User::factory()->create(['role' => 'developer']);
     $project = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',
@@ -212,7 +212,7 @@ test('bulk-assign-managers: by-id lookup accepts admin-role users', function () 
     $adminManager = User::factory()->create(['role' => 'admin']);
     $project = Project::factory()->create(['manager_id' => null]);
 
-    LsmServer::actingAs($admin)
+    LsmServer::actingAs(actingWithScopes($admin, ['*']))
         ->tool(BulkAssignManagersTool::class, [
             'action' => 'assign',
             'mode' => 'specific',

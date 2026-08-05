@@ -44,7 +44,16 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Attach a real personal access token to a user so tokenCan() works.
+ *
+ * Do not use Sanctum::actingAs() for scope tests: it builds a Mockery mock that
+ * only stubs can() for the abilities you list, so asserting that some *other*
+ * ability is denied raises a Mockery error instead of returning false.
+ */
+function actingWithScopes(\App\Models\User $user, array $scopes): \App\Models\User
 {
-    // ..
+    $token = $user->createToken('test-token', $scopes, now()->addMinutes(60));
+
+    return $user->withAccessToken($token->accessToken);
 }
