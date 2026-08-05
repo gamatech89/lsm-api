@@ -56,8 +56,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->name('ephemeral-secrets.access');
 
     // SITE REVIEW PROXY (auth required - iframe src sends session cookie)
+    //
+    // This route predates the PROTECTED ROUTES group below and was never
+    // folded into it, so it registers its own middleware stack here and does
+    // NOT inherit anything added to that group later — including
+    // RejectIntegrationTokens. It must be listed explicitly, or an
+    // integration token (MCP-only, meant to sit in a config file for a year)
+    // can drive this server-side URL fetcher directly. If you're adding a new
+    // route outside the group at the bottom of this file, it needs the same
+    // explicit treatment — see RejectIntegrationTokensTest for the regression
+    // test that would have caught this one.
     Route::get('/site-review-proxy', [V1\SiteReviewProxyController::class, 'proxy'])
-        ->middleware(['auth:sanctum', 'throttle:60,1'])
+        ->middleware(['auth:sanctum', \App\Http\Middleware\RejectIntegrationTokens::class, 'throttle:60,1'])
         ->name('site-review-proxy');
 
     // SITE REVIEW SHARE (Public - password-protected at app level) — throttled
