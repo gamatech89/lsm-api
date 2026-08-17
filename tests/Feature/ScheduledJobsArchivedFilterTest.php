@@ -34,6 +34,9 @@ function seedActiveAndArchivedProjects(): array
 
 test('scheduled backup job backs up active projects and skips archived ones', function () {
     Queue::fake();
+    // Automatic backups are opt-in (off by default); enable them here because
+    // this test is about the archived-status filter, not the opt-in gate.
+    config(['backup.schedule.enabled' => true]);
 
     [$active, $archived] = seedActiveAndArchivedProjects();
 

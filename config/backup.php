@@ -64,8 +64,14 @@ return [
     */
 
     'schedule' => [
-        // Enable automatic scheduled backups
-        'enabled' => env('BACKUP_SCHEDULE_ENABLED', true),
+        // Enable automatic scheduled backups.
+        //
+        // OFF by default: backups must only be created on explicit request
+        // (SPA "Create Backup" button, POST /projects/{id}/backups, MCP tool).
+        // When this is false the ScheduledBackupJob is not even registered
+        // with the scheduler (see routes/console.php). Set
+        // BACKUP_SCHEDULE_ENABLED=true to opt in to nightly automatic backups.
+        'enabled' => env('BACKUP_SCHEDULE_ENABLED', false),
 
         // Frequency: daily, weekly, monthly
         'frequency' => env('BACKUP_SCHEDULE_FREQUENCY', 'weekly'),

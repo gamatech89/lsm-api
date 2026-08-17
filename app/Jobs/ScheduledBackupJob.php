@@ -25,7 +25,7 @@ class ScheduledBackupJob implements ShouldQueue
      */
     public function handle(): void
     {
-        if (!config('backup.schedule.enabled', true)) {
+        if (!config('backup.schedule.enabled', false)) {
             Log::info('ScheduledBackupJob: Scheduled backups are disabled');
             return;
         }

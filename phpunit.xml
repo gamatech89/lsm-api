@@ -33,5 +33,7 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <!-- MFA enforcement off by default in tests; MfaEnforcementTest enables it explicitly. -->
         <env name="MFA_ENFORCED_ROLES" value=""/>
+        <!-- Automatic backups are opt-in; keep tests independent of a developer's local .env opt-in. -->
+        <env name="BACKUP_SCHEDULE_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>
