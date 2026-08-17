@@ -86,19 +86,24 @@ if ($uptimeEnabled) {
 | Backup Tasks
 |--------------------------------------------------------------------------
 |
-| Scheduled backups run based on the configured frequency (daily, weekly, monthly)
-| Cleanup job runs daily to remove old backups based on retention policy
+| Automatic backups are OPT-IN and disabled by default: backups must only be
+| created when a human explicitly asks for one. Set BACKUP_SCHEDULE_ENABLED=true
+| to register the nightly ScheduledBackupJob (frequency daily/weekly/monthly
+| from config/backup.php). When disabled the task is not registered at all.
+| Cleanup job runs daily to remove old backups based on retention policy.
 |
 */
 
-// Run scheduled backups at 3:00 AM (configurable time in config/backup.php)
-Schedule::job(new \App\Jobs\ScheduledBackupJob())
-    ->daily()
-    ->at(config('backup.schedule.time', '03:00'))
-    ->timezone('Europe/Berlin')
-    ->withoutOverlapping()
-    ->name('scheduled-backups')
-    ->onOneServer();
+if (config('backup.schedule.enabled', false)) {
+    // Run scheduled backups at 3:00 AM (configurable time in config/backup.php)
+    Schedule::job(new \App\Jobs\ScheduledBackupJob())
+        ->daily()
+        ->at(config('backup.schedule.time', '03:00'))
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping()
+        ->name('scheduled-backups')
+        ->onOneServer();
+}
 
 // Cleanup old backups daily at 4:00 AM
 Schedule::job(new \App\Jobs\CleanupOldBackupsJob())
