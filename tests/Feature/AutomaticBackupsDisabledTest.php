@@ -19,7 +19,31 @@ use Illuminate\Support\Facades\Queue;
  */
 
 test('automatic backup scheduling is disabled by default', function () {
-    expect(config('backup.schedule.enabled'))->toBeFalse();
+    // Assert the SHIPPED default in config/backup.php, independent of whatever
+    // BACKUP_SCHEDULE_ENABLED happens to be in the ambient environment
+    // (phpunit.xml pins it to false, a developer's .env may opt in): evaluate
+    // the config file with the variable removed from every source env() reads.
+    $key = 'BACKUP_SCHEDULE_ENABLED';
+    $saved = [getenv($key), $_ENV[$key] ?? null, $_SERVER[$key] ?? null];
+
+    putenv($key);
+    unset($_ENV[$key], $_SERVER[$key]);
+
+    try {
+        $shipped = require config_path('backup.php');
+    } finally {
+        if ($saved[0] !== false) {
+            putenv("{$key}={$saved[0]}");
+        }
+        if ($saved[1] !== null) {
+            $_ENV[$key] = $saved[1];
+        }
+        if ($saved[2] !== null) {
+            $_SERVER[$key] = $saved[2];
+        }
+    }
+
+    expect($shipped['schedule']['enabled'])->toBeFalse();
 });
 
 test('scheduler does not register the scheduled-backups task when disabled', function () {
