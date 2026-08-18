@@ -246,6 +246,8 @@ class BackupController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                // Master feature switch (BACKUP_ENABLED). The SPA hides its backup UI when false.
+                'enabled' => (bool) config('backup.enabled', false),
                 'driver' => config('backup.driver'),
                 'available_drivers' => ['local', 's3', 'gcs', 'gdrive'],
                 'retention' => config('backup.retention'),

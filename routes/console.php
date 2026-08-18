@@ -92,9 +92,13 @@ if ($uptimeEnabled) {
 | from config/backup.php). When disabled the task is not registered at all.
 | Cleanup job runs daily to remove old backups based on retention policy.
 |
+| Both sit behind the backup feature master switch BACKUP_ENABLED
+| (config('backup.enabled')): when the feature is off, no backup task at all
+| is registered.
+|
 */
 
-if (config('backup.schedule.enabled', false)) {
+if (config('backup.enabled', false) && config('backup.schedule.enabled', false)) {
     // Run scheduled backups at 3:00 AM (configurable time in config/backup.php)
     Schedule::job(new \App\Jobs\ScheduledBackupJob())
         ->daily()
@@ -105,13 +109,15 @@ if (config('backup.schedule.enabled', false)) {
         ->onOneServer();
 }
 
-// Cleanup old backups daily at 4:00 AM
-Schedule::job(new \App\Jobs\CleanupOldBackupsJob())
-    ->dailyAt('04:00')
-    ->timezone('Europe/Berlin')
-    ->withoutOverlapping()
-    ->name('cleanup-old-backups')
-    ->onOneServer();
+// Cleanup old backups daily at 4:00 AM (only while the backup feature is on)
+if (config('backup.enabled', false)) {
+    Schedule::job(new \App\Jobs\CleanupOldBackupsJob())
+        ->dailyAt('04:00')
+        ->timezone('Europe/Berlin')
+        ->withoutOverlapping()
+        ->name('cleanup-old-backups')
+        ->onOneServer();
+}
 
 /*
 |--------------------------------------------------------------------------
