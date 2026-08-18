@@ -35,5 +35,8 @@
         <env name="MFA_ENFORCED_ROLES" value=""/>
         <!-- Automatic backups are opt-in; keep tests independent of a developer's local .env opt-in. -->
         <env name="BACKUP_SCHEDULE_ENABLED" value="false" force="true"/>
+        <!-- Backup feature is off by default; tests exercise the backup routes/tools, so turn it on here.
+             BackupFeatureFlagTest covers the disabled behaviour explicitly. -->
+        <env name="BACKUP_ENABLED" value="true" force="true"/>
     </php>
 </phpunit>

@@ -370,16 +370,20 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // -------------------------------------------------
         // BACKUPS (nested under projects)
         // -------------------------------------------------
-        // Settings must come BEFORE apiResource to avoid conflict with shallow GET /backups/{backup}
+        // Settings must come BEFORE apiResource to avoid conflict with shallow GET /backups/{backup}.
+        // Deliberately NOT behind EnsureBackupsEnabled: it reports `enabled` so the SPA can hide the UI.
         Route::get('/backups/settings', [V1\BackupController::class, 'settings'])
             ->name('backups.settings');
-        Route::apiResource('projects.backups', V1\BackupController::class)->shallow();
-        Route::get('/backups/{backup}/download', [V1\BackupController::class, 'download'])
-            ->name('backups.download');
-        Route::post('/backups/{backup}/restore', [V1\BackupController::class, 'restore'])
-            ->name('backups.restore');
-        Route::get('/projects/{project}/backups-stats', [V1\BackupController::class, 'stats'])
-            ->name('projects.backups.stats');
+        // Whole feature is behind BACKUP_ENABLED (config/backup.php) — 403 when off.
+        Route::middleware(\App\Http\Middleware\EnsureBackupsEnabled::class)->group(function () {
+            Route::apiResource('projects.backups', V1\BackupController::class)->shallow();
+            Route::get('/backups/{backup}/download', [V1\BackupController::class, 'download'])
+                ->name('backups.download');
+            Route::post('/backups/{backup}/restore', [V1\BackupController::class, 'restore'])
+                ->name('backups.restore');
+            Route::get('/projects/{project}/backups-stats', [V1\BackupController::class, 'stats'])
+                ->name('projects.backups.stats');
+        });
 
         // -------------------------------------------------
         // PHP ERRORS (nested under projects)

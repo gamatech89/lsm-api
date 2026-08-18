@@ -4,6 +4,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Backup Feature Switch
+    |--------------------------------------------------------------------------
+    |
+    | Master switch for the whole backup feature. OFF by default: the feature
+    | is not in use yet and a failed create attempt leaves an orphaned multi-GB
+    | zip on the client site. When false, every backup API route except
+    | GET /backups/settings answers 403, the MCP backup tools are not
+    | registered, the SPA hides the backup UI, and no backup scheduler task is
+    | registered. Set BACKUP_ENABLED=true (and run config:cache) to turn it on.
+    |
+    */
+
+    // filter_var so BACKUP_ENABLED=off|no|0 also reads as false (env() alone
+    // only coerces the literal true/false strings).
+    'enabled' => filter_var(env('BACKUP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Backup Storage Driver
     |--------------------------------------------------------------------------
     |

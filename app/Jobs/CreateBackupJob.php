@@ -52,6 +52,21 @@ class CreateBackupJob implements ShouldQueue
     public function handle(BackupStorageService $storage): void
     {
         $backup = $this->backup;
+
+        // Backstop for the BACKUP_ENABLED master switch: every dispatcher is
+        // already gated, but a job that was queued before the flag flipped (or a
+        // future direct dispatch) must still never touch the client site.
+        if (! config('backup.enabled', false)) {
+            Log::info("CreateBackupJob: backup feature disabled (BACKUP_ENABLED=false); skipping backup {$backup->id}");
+            $backup->update([
+                'status' => 'failed',
+                'completed_at' => now(),
+                'error_message' => 'Backups are currently disabled.',
+            ]);
+
+            return;
+        }
+
         $project = $backup->project;
         $lsmService = LsmService::for($project);
 

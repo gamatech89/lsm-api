@@ -10,10 +10,13 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 use App\Mcp\Concerns\HasRequiredScope;
+use App\Mcp\Concerns\RequiresBackupFeature;
 
 class WpCreateBackupTool extends Tool
 {
-    use HasRequiredScope;
+    use HasRequiredScope, RequiresBackupFeature {
+        RequiresBackupFeature::shouldRegister insteadof HasRequiredScope;
+    }
 
     protected function requiredScope(): string
     {
@@ -31,7 +34,7 @@ class WpCreateBackupTool extends Tool
 
     public function handle(Request $request): Response
     {
-        if ($denied = $this->assertScope()) {
+        if ($denied = $this->assertBackupFeature() ?? $this->assertScope()) {
             return $denied;
         }
 
