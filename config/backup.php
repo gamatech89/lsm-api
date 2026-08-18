@@ -16,7 +16,9 @@ return [
     |
     */
 
-    'enabled' => env('BACKUP_ENABLED', false),
+    // filter_var so BACKUP_ENABLED=off|no|0 also reads as false (env() alone
+    // only coerces the literal true/false strings).
+    'enabled' => filter_var(env('BACKUP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------

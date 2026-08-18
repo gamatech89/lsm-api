@@ -22,12 +22,15 @@ use Laravel\Mcp\Response;
  */
 trait RequiresBackupFeature
 {
+    /** Provided by HasRequiredScope on the consuming class. */
+    abstract protected function tokenHasRequiredScope(): bool;
+
     public function shouldRegister(): bool
     {
-        return static::backupFeatureEnabled() && $this->tokenHasRequiredScope();
+        return $this->backupFeatureEnabled() && $this->tokenHasRequiredScope();
     }
 
-    protected static function backupFeatureEnabled(): bool
+    protected function backupFeatureEnabled(): bool
     {
         return (bool) config('backup.enabled', false);
     }
@@ -38,7 +41,7 @@ trait RequiresBackupFeature
      */
     protected function assertBackupFeature(): ?Response
     {
-        if (static::backupFeatureEnabled()) {
+        if ($this->backupFeatureEnabled()) {
             return null;
         }
 

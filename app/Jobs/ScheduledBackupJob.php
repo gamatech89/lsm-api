@@ -25,6 +25,13 @@ class ScheduledBackupJob implements ShouldQueue
      */
     public function handle(): void
     {
+        // BACKUP_ENABLED master switch backstop (the scheduler does not even
+        // register this job when it is off — see routes/console.php).
+        if (!config('backup.enabled', false)) {
+            Log::info('ScheduledBackupJob: backup feature disabled (BACKUP_ENABLED=false)');
+            return;
+        }
+
         if (!config('backup.schedule.enabled', false)) {
             Log::info('ScheduledBackupJob: Scheduled backups are disabled');
             return;

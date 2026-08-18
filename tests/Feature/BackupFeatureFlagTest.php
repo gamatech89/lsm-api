@@ -165,3 +165,45 @@ test('the cleanup scheduler task is registered when the feature is on', function
     expect($names)->toContain('cleanup-old-backups');
     expect($names)->not->toContain('scheduled-backups');
 });
+
+test('a queued CreateBackupJob does not touch the site when the feature is disabled', function () {
+    // Backstop: a job queued before the flag flipped must not call the plugin.
+    config(['backup.enabled' => false]);
+    \Illuminate\Support\Facades\Http::fake();
+    $admin = User::factory()->create(['role' => 'admin']);
+    $project = Project::factory()->create(['health_check_secret' => 'secret-123']);
+    $backup = $project->backups()->create([
+        'created_by' => $admin->id, 'type' => 'manual', 'status' => 'pending',
+    ]);
+
+    (new \App\Jobs\CreateBackupJob($backup))->handle(app(\App\Services\BackupStorageService::class));
+
+    \Illuminate\Support\Facades\Http::assertNothingSent();
+    expect($backup->fresh()->status)->toBe('failed');
+    expect($backup->fresh()->error_message)->toBe('Backups are currently disabled.');
+});
+
+test('ScheduledBackupJob creates nothing when the feature is disabled even if scheduling is opted in', function () {
+    config(['backup.enabled' => false, 'backup.schedule.enabled' => true]);
+    Queue::fake();
+    Project::factory()->create(['health_check_secret' => 'secret-123', 'status' => 'active']);
+
+    (new \App\Jobs\ScheduledBackupJob)->handle();
+
+    $this->assertDatabaseCount('backups', 0);
+    Queue::assertNothingPushed();
+});
+
+test('BACKUP_ENABLED accepts off/no/0 as false', function () {
+    foreach (['off', 'no', '0', 'false', ''] as $value) {
+        putenv("BACKUP_ENABLED={$value}");
+        $_ENV['BACKUP_ENABLED'] = $_SERVER['BACKUP_ENABLED'] = $value;
+        try {
+            expect((require config_path('backup.php'))['enabled'])->toBeFalse("BACKUP_ENABLED={$value}");
+        } finally {
+            putenv('BACKUP_ENABLED=true');
+            $_ENV['BACKUP_ENABLED'] = $_SERVER['BACKUP_ENABLED'] = 'true';
+        }
+    }
+    expect((require config_path('backup.php'))['enabled'])->toBeTrue();
+});
