@@ -62,3 +62,40 @@ test('enforcement extends to all roles when configured', function () {
 
     $this->actingAs($dev)->getJson('/api/v1/projects')->assertStatus(403);
 });
+
+test('an is_admin flag holder is enforced like an admin regardless of role', function () {
+    // Daniel-case: role=manager but is_admin=true grants full admin power via
+    // User::isAdmin()/ProjectPolicy::before(), so "admins must have 2FA" has
+    // to cover the flag too, not just role === 'admin'.
+    $flagAdmin = User::factory()->create([
+        'role' => 'manager',
+        'is_admin' => true,
+        'two_factor_confirmed_at' => null,
+        'two_factor_email_enabled' => false,
+    ]);
+
+    $this->actingAs($flagAdmin)->getJson('/api/v1/projects')
+        ->assertStatus(403)
+        ->assertJsonPath('code', 'two_factor_setup_required');
+});
+
+test('an enrolled is_admin flag holder is not blocked', function () {
+    $flagAdmin = User::factory()->create([
+        'role' => 'developer',
+        'is_admin' => true,
+        'two_factor_confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($flagAdmin)->getJson('/api/v1/projects')->assertOk();
+});
+
+test('an is_admin flag holder is not enforced when admin is not an enforced role', function () {
+    config(['auth.mfa_enforced_roles' => []]);
+    $flagAdmin = User::factory()->create([
+        'role' => 'manager',
+        'is_admin' => true,
+        'two_factor_confirmed_at' => null,
+    ]);
+
+    $this->actingAs($flagAdmin)->getJson('/api/v1/projects')->assertOk();
+});

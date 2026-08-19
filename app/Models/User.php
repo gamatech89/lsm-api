@@ -96,7 +96,13 @@ class User extends Authenticatable
     {
         $enforcedRoles = config('auth.mfa_enforced_roles', ['admin']);
 
-        if (! in_array($this->role, $enforcedRoles, true)) {
+        // The is_admin flag grants full admin power (isAdmin(), policy
+        // before()-hooks) regardless of role, so when 'admin' is enforced it
+        // must cover flag holders too — not just role === 'admin'.
+        $enforced = in_array($this->role, $enforcedRoles, true)
+            || ($this->is_admin && in_array('admin', $enforcedRoles, true));
+
+        if (! $enforced) {
             return false;
         }
 
