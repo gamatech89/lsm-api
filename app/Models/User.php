@@ -112,6 +112,18 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether this user can SEE every project (list/detail/dashboard/search/
+     * MCP reads) regardless of assignment. Admins always can; managers can
+     * while permissions.managers_view_all_projects is on. Purely about
+     * visibility — write authority still goes through ProjectPolicy.
+     */
+    public function canViewAllProjects(): bool
+    {
+        return $this->isAdmin()
+            || ($this->isManager() && config('permissions.managers_view_all_projects', false));
+    }
+
+    /**
      * Check if user is a developer.
      */
     public function isDeveloper(): bool

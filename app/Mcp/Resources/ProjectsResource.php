@@ -47,7 +47,7 @@ class ProjectsResource extends Resource
         // Apply role-based filtering
         if ($user->role === 'developer') {
             $query->whereHas('developers', fn($q) => $q->where('user_id', $user->id));
-        } elseif ($user->role === 'manager') {
+        } elseif ($user->role === 'manager' && !$user->canViewAllProjects()) {
             $query->where(function($q) use ($user) {
                 $q->where('manager_id', $user->id)
                   ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));

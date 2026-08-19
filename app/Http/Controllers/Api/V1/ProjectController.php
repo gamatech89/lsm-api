@@ -45,8 +45,9 @@ class ProjectController extends Controller
             ->withCount(['todos', 'credentials', 'resources', 'maintenanceReports'])
             ->withCount(['todos as pending_todos_count' => fn($q) => $q->where('status', '!=', 'completed')]);
 
-        // Role-based filtering (admins and is_admin users see all)
-        if (!$user->isAdmin()) {
+        // Role-based filtering (admins — and managers while
+        // permissions.managers_view_all_projects is on — see all)
+        if (!$user->canViewAllProjects()) {
             if ($user->role === 'developer') {
                 $query->where(function($q) use ($user) {
                     $q->where('developer_id', $user->id)
@@ -137,8 +138,9 @@ class ProjectController extends Controller
             ->select('id', 'name', 'url', 'project_external_id', 'health_status')
             ->with(['tags:id,name,color']);
 
-        // Role-based filtering (admins and is_admin users see all)
-        if (!$user->isAdmin()) {
+        // Role-based filtering (admins — and managers while
+        // permissions.managers_view_all_projects is on — see all)
+        if (!$user->canViewAllProjects()) {
             if ($user->role === 'developer') {
                 $query->where(function($q) use ($user) {
                     $q->where('developer_id', $user->id)
