@@ -48,7 +48,7 @@ class SearchController extends Controller
                 $q->where('developer_id', $user->id)
                   ->orWhereHas('developers', fn($sub) => $sub->where('users.id', $user->id));
             });
-        } elseif ($user->role === 'manager') {
+        } elseif ($user->role === 'manager' && !$user->canViewAllProjects()) {
             $projectsQuery->where(function($q) use ($user) {
                 $q->where('manager_id', $user->id)
                   ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));

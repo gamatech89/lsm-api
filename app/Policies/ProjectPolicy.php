@@ -34,6 +34,12 @@ class ProjectPolicy
      */
     public function view(User $user, Project $project): bool
     {
+        // Managers see every project while permissions.managers_view_all_projects
+        // is on (visibility only — update/delete/credentials stay assignment-scoped).
+        if ($user->canViewAllProjects()) {
+            return true;
+        }
+
         if ($user->role === 'manager') {
             return $project->isManagedBy($user);
         }

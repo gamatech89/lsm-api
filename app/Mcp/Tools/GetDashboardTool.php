@@ -43,7 +43,7 @@ class GetDashboardTool extends Tool
 
         if ($user->role === 'developer') {
             $projectsQuery->whereHas('developers', fn($q) => $q->where('user_id', $user->id));
-        } elseif ($user->role === 'manager') {
+        } elseif ($user->role === 'manager' && !$user->canViewAllProjects()) {
             $projectsQuery->where(function($q) use ($user) {
                 $q->where('manager_id', $user->id)
                   ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));

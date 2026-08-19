@@ -86,7 +86,7 @@ class DashboardController extends Controller
                       ->whereColumn('project_developer.project_id', 'projects.id')
                       ->where('project_developer.user_id', $user->id);
                 });
-            } elseif ($user->role === 'manager') {
+            } elseif ($user->role === 'manager' && !$user->canViewAllProjects()) {
                 $query->where(function($q2) use ($user) {
                     $q2->where('manager_id', $user->id)
                        ->orWhereExists(function ($q3) use ($user) {
@@ -157,7 +157,7 @@ class DashboardController extends Controller
         // Apply role-based filtering
         if ($user->role === 'developer') {
             $query->whereHas('developers', fn($q) => $q->where('user_id', $user->id));
-        } elseif ($user->role === 'manager') {
+        } elseif ($user->role === 'manager' && !$user->canViewAllProjects()) {
             $query->where(function($q) use ($user) {
                 $q->where('manager_id', $user->id)
                   ->orWhereHas('managers', fn($sub) => $sub->where('users.id', $user->id));
