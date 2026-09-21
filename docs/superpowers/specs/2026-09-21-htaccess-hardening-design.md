@@ -54,7 +54,7 @@ check, counting hardening in the panel's security score.
    as paused + overdue.
 7. Auto-resume runs on `shutdown` after the response is flushed, never inline
    in a visitor or uptime request, never in CLI.
-8. Atomic lock (`add_option`), time budget, snapshot only on disk while an
+8. Atomic lock (`INSERT IGNORE` options row), time budget, snapshot only on disk while an
    operation is pending, `pending` stores an enum never a path.
 9. Rule patterns are case-insensitive; the uploads rule also covers
    `.phtml .pht .phps .phar` and double extensions.
@@ -172,7 +172,10 @@ regenerated whole from the candidate state.
 
 ### Lock and time budget
 
-- Lock: `add_option('lsm_hardening_lock', time(), '', 'no')` — atomic insert.
+- Lock: one options row `lsm_hardening_lock` (value = unix time, autoload `no`)
+  taken with a raw `INSERT IGNORE`, then `update_option()` for the cache — the
+  pattern of core's `WP_Upgrader::create_lock()`. `add_option()` is not used for
+  the insert: it checks and then upserts, which is not atomic.
   A lock older than 180 s is stale: delete and retry once. Busy →
   `success:false, reason:'busy'`; busy never changes any state or `last_result`.
 - Every loopback: timeout 5 s, `redirection => 0`, no cookies,
@@ -326,7 +329,9 @@ wrapper, so nothing on the platform can unwrap `success` away):
 `not_enabled`, `unsupported`, `loopback_blocked`, `markers_corrupt`,
 `snapshot_failed`, `write_failed`, `asset_broken`, `rule_ineffective`,
 `pause_ineffective_foreign_rule`, `rollback_failed`. `last_result.reason` may
-also be `crash_recovered`. Warnings: `already_blocked_elsewhere`, `unverified`.
+also be `crash_recovered`. `not_writable` (an `unsupported_reason`) also covers
+a file that exists but cannot be read; `write_failed` also covers "the file
+changed between building the block and the snapshot — nothing was written". Warnings: `already_blocked_elsewhere`, `unverified`.
 `last_result.action`: `enable`, `disable`, `pause`, `resume`, `auto_resume`,
 `crash_recovery`, `deactivate`.
 
@@ -337,7 +342,8 @@ also be `crash_recovered`. Warnings: `already_blocked_elsewhere`, `unverified`.
   `handleResponse()`. GETs append `_=<microtime>` (one host caches plugin REST
   GETs for 28 days). POSTs use 120 s.
 - Routes inside the existing `projects/{project}/lsm` group, after
-  `security-headers/snippets`; POSTs additionally behind `throttle:12,1`:
+  `security-headers/snippets`; POSTs additionally behind `throttle:12,1,hardening`
+  (the third parameter gives these routes their own counter):
   `GET /hardening`, `POST /hardening/rule`, `POST /hardening/pause`,
   `POST /hardening/resume`.
 - `ProjectPolicy` (admins pass everything through `before()`):
