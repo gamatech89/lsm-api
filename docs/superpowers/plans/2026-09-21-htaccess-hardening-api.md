@@ -84,6 +84,9 @@
 
 ## Deviations from the spec
 
+0. **Opportunistic close keys on state `on` only** (changed after the plugin's final review): a status GET taken mid-operation reports `drift` with `pause_until` not yet committed; closing the row then would leave a finisher-less host (no `fastcgi_finish_request`) with no resumer. Rows for sites that end up `off`/`manual` (e.g. after a deactivate/reactivate cycle) are closed by the rule endpoint or by `hardening:resume-expired` (24 h → `failed_at` + one notification). The quoted test counts in Tasks 5-13 and the full-suite total are therefore +1 (one dataset row became 1 + 3 cases: 24 → 26 in Task 5, and every later cumulative count +2).
+
+
 All five are platform-internal; none changes a shared name, route, JSON key or reason code.
 
 1. **`throttle:12,1,hardening`, not bare `throttle:12,1`.** `ThrottleRequests::handle()` builds the counter key as `$prefix . sha1(user id)` (`vendor/laravel/framework/src/Illuminate/Routing/Middleware/ThrottleRequests.php:85-106, 222-231`), so every un-prefixed `throttle:N,M` route shares **one per-user counter**. `/search` (`routes/api.php:459-461`, `throttle:30,1`) is hit repeatedly while someone uses the global search; 13 of those in a minute would lock the same user out of every hardening POST. Verified with a test in a scratch copy: it fails with `throttle:12,1` and passes with the third parameter. The limit stays 12 per minute.
@@ -1360,7 +1363,7 @@ test('the plugin own pause_overdue flag is passed on when the platform has no ro
         ->assertJsonPath('pause_overdue', true);
 });
 
-test('an open row is closed opportunistically when the plugin no longer reports paused', function (string $state) {
+test('an open row is closed opportunistically only when the plugin confirms the rule is on', function (string $state) {
     fakeHardeningStatus(hardeningPluginStatus($state));
     $project = hardeningProject();
     $pause = ProjectHardeningPause::factory()->create([
@@ -1377,7 +1380,24 @@ test('an open row is closed opportunistically when the plugin no longer reports 
 
     expect($pause->fresh()->resumed_at)->not->toBeNull();
     expect($pause->fresh()->note)->toBe('Closed from status: site no longer paused');
-})->with(['on', 'off', 'drift', 'manual']);
+})->with(['on']);
+
+test('a status other than a confirmed on does not close the row', function (string $state) {
+    fakeHardeningStatus(hardeningPluginStatus($state));
+    $project = hardeningProject();
+    $pause = ProjectHardeningPause::factory()->create([
+        'project_id' => $project->id,
+        'paused_until' => now()->subMinutes(5),
+        'created_at' => now()->subMinutes(65),
+    ]);
+
+    $this->actingAs(hardeningUser('admin'))
+        ->getJson("/api/v1/projects/{$project->id}/lsm/hardening")
+        ->assertOk()
+        ->assertJsonPath('open_pause.id', $pause->id);
+
+    expect($pause->fresh()->resumed_at)->toBeNull();
+})->with(['off', 'drift', 'manual']);
 
 test('an unsupported rule whose pause_until is still set does not close the row', function () {
     fakeHardeningStatus(hardeningPluginStatus('unsupported', now()->subMinutes(5)->timestamp, true));
@@ -1507,7 +1527,10 @@ class HardeningController extends Controller
         $archives = $status['rules']['block_archives']['state'] ?? null;
         // `unsupported` outranks `paused` in the plugin's state order, so a pause can
         // still be pending behind another state: only a cleared pause_until proves it ended.
-        $stillPaused = $archives === 'paused' || ($status['pause_until'] ?? null) !== null;
+        // Only a confirmed `on` proves the pause ended: mid-operation the plugin can report
+        // `drift` (rule out of the file, pause_until not yet committed) — closing then would
+        // leave a finisher-less host with no resumer at all.
+        $stillPaused = $archives !== 'on' || ($status['pause_until'] ?? null) !== null;
         if (is_string($archives) && !$stillPaused) {
             $this->closeOpenPauses($project, 'Closed from status: site no longer paused', true);
         }

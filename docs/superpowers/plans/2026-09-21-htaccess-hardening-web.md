@@ -982,7 +982,7 @@ Design decisions already made (do not re-open them):
 - State tag colours: `on` success, `off` default, `paused` warning, `manual` blue, `drift` orange, `unsupported` default.
 - `unsupported` carries its reason in a tooltip on the tag; `manual` and `drift` explain themselves the same way.
 - The overdue alert reads the **top-level** `pause_overdue` (the API already folds the plugin's own flag into it) and shows in quiet states too — the platform knows about an open pause even when the site cannot be asked.
-- `crash_recovered` is the one `last_result` reason that belongs to no rule row, so it gets its own quiet line. Nothing else of `last_result` is shown.
+- `crash_recovered` and `rollback_failed` are the two `last_result` reasons that belong to no rule row (crash recovery), so they get their own quiet line. Nothing else of `last_result` is shown.
 - The card has `marginTop: 16` and `marginBottom: 16`: the "HTTP Security Headers" card below it has no margin of its own.
 
 - [ ] **Step 1: Create `src/features/projects/components/HardeningCard.tsx`**
@@ -1161,10 +1161,10 @@ export function HardeningCard({ project }: HardeningCardProps) {
           })}
         </div>
         {/* The one last_result reason that belongs to no rule row. */}
-        {status.last_result?.reason === 'crash_recovered' && (
+        {(status.last_result?.reason === 'crash_recovered' || status.last_result?.reason === 'rollback_failed') && (
           <div style={{ marginTop: 8 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {t('projects.hardening.reasons.crash_recovered')}
+              {t(`projects.hardening.reasons.${status.last_result.reason}`)}
             </Text>
           </div>
         )}
@@ -1985,10 +1985,10 @@ export function HardeningCard({ project }: HardeningCardProps) {
           })}
         </div>
         {/* The one last_result reason that belongs to no rule row. */}
-        {status.last_result?.reason === 'crash_recovered' && (
+        {(status.last_result?.reason === 'crash_recovered' || status.last_result?.reason === 'rollback_failed') && (
           <div style={{ marginTop: 8 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {t('projects.hardening.reasons.crash_recovered')}
+              {t(`projects.hardening.reasons.${status.last_result.reason}`)}
             </Text>
           </div>
         )}
@@ -2232,7 +2232,7 @@ Where the spec is silent on something the web shares with the API, this plan tak
 2. **The shape of `open_pause` is not specified.** The web types it as `Record<string, unknown> | null` and uses only null vs. non-null (the "a download pause is still open" line when the site is unreachable). No field of it is read.
 3. **No ability is named for `POST /hardening/resume`.** "Re-enable now" is gated on `can.pause` — whoever may pause may end the pause.
 4. **The top-level `pause_overdue` is authoritative.** The spec defines it as "open pause row past `paused_until`, or the plugin's own `pause_overdue`", so the card never reads `status.pause_overdue` separately.
-5. **`last_result` may be `null`** (a site that never ran an operation) and **`last_result.rule` may be `null`** (crash recovery, deactivation). Typed that way; only `last_result.reason === 'crash_recovered'` is displayed.
+5. **`last_result` may be `null`** (a site that never ran an operation) and **`last_result.rule` may be `null`** (crash recovery, deactivation). Typed that way; only `last_result.reason === 'crash_recovered'` or `'rollback_failed'` (both from crash recovery) is displayed.
 6. **Request bodies:** `{ rule: string, enabled: boolean }` and `{ minutes: number }` as JSON with real booleans/numbers; resume sends `{}`.
 7. **Failure bodies carry `status`**, but the web does not consume it — it always re-reads `GET /hardening` on settle, which is what the spec asks for.
 8. **Stricter than the spec on 2xx:** the spec says to treat a 2xx with `success === false` as failure; the hook treats any 2xx body that is not `success === true` as failure, so an HTML page from a proxy can never produce an "applied" toast.

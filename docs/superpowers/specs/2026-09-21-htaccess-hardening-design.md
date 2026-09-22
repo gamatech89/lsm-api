@@ -121,7 +121,7 @@ No existing behaviour changes.
 
 ```
 rules:           { block_archives: bool, block_debug_log: bool, block_uploads_php: bool }   // desired
-pause_until:     int|null     // unix time, block_archives only
+pause_until:     int|null     // unix time, block_archives only; anything but a positive int reads as null
 last_attempt_at: int|null     // throttle for auto-resume
 pending:         { target: 'content'|'uploads', op: 'enable'|'disable'|'pause'|'resume', started_at: int, existed: bool } | null
 last_result:     { at, action, rule, ok, reason, warnings[] }
@@ -239,8 +239,13 @@ regenerated whole from the candidate state.
   `pause_until` set and `< now`, `PHP_SAPI !== 'cli'`, not a request to
   `lsm/v1/hardening/*`, and `last_attempt_at` older than 300 s. If so it
   registers a `shutdown` callback (late priority) that first calls
-  `fastcgi_finish_request()` / `litespeed_finish_request()` when available, then:
-  take the lock (busy → return silently), set `last_attempt_at`, baseline 2a
+  `fastcgi_finish_request()` / `litespeed_finish_request()`. If neither exists
+  (mod_php, CGI) the callback does nothing at all — no lock, no state change, no
+  HTTP — and the resume is left to the platform backstop and the REST `resume`,
+  because the work would otherwise run inside the visitor's (or the uptime
+  probe's) connection. Otherwise, after the response is handed off:
+  take the lock (busy → return silently), `@set_time_limit(120)`, set
+  `last_attempt_at`, baseline 2a
   before, snapshot + pending(op=resume), write the block with the archive rule,
   read back, baseline 2a after. Roll back **only** if 2a went from 200 to
   non-200. If the loopback itself fails, keep the block (it was verified on
@@ -260,8 +265,14 @@ On `init`, if `pending` is set and older than 180 s: take the lock, then
 - op `resume` → roll forward: make sure the block contains the archive rule
   (light path without HTTP), then clear `pause_until`;
 - any other op → restore the snapshot file if present;
-- always: delete the snapshot and any `lsm-probe-*` files in both directories,
-  clear `pending`, record `last_result.reason = 'crash_recovered'`.
+- if the restore itself could not be verified (write failed, snapshot
+  unreadable): strip only the managed block as the last resort, KEEP that
+  directory's `.htaccess.lsm-bak` (it is the only copy of the original bytes),
+  delete only the probe files, record `last_result.reason = 'rollback_failed'`
+  and log at `error`;
+- otherwise: delete the snapshot and any `lsm-probe-*` files in both
+  directories, record `last_result.reason = 'crash_recovered'`;
+- always: clear `pending`, release the lock.
 The target file is derived from `pending.target`, never from a stored path.
 
 ### Manual rules already on a site (adoption)
