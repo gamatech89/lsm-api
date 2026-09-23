@@ -241,6 +241,23 @@ test('a row whose pausing user is gone still notifies the admins', function () {
     Notification::assertSentToTimes($admin, HardeningPauseOverdueNotification::class, 1);
 });
 
+test('a row already stamped by another overlapping run is not notified again', function () {
+    // Simulates two command runs overlapping: the row was selected by both
+    // (overdue_notified_at was still null at SELECT time for this run too),
+    // but "another run" already claimed and stamped it first. The atomic
+    // claim in process() must see the non-null value and skip notifying.
+    Notification::fake();
+    Http::fake(['*' => Http::failedConnection()]);
+    hardeningUser('admin');
+    $pause = expiredHardeningPause(45, ['overdue_notified_at' => now()->subMinute()]);
+    $stampedAt = $pause->fresh()->overdue_notified_at;
+
+    $this->artisan('hardening:resume-expired')->assertExitCode(0);
+
+    Notification::assertNothingSent();
+    expect($pause->fresh()->overdue_notified_at->eq($stampedAt))->toBeTrue();
+});
+
 test('a row that gets closed in this run is not reported as overdue', function () {
     Notification::fake();
     fakeBackstopResume(hardeningPluginBody(true, null, hardeningPluginStatus('on')));

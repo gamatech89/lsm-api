@@ -95,21 +95,32 @@ class ResumeExpiredHardeningPauses extends Command
         $due = $pause->failed_at !== null || $pause->paused_until->lt(now()->subMinutes(30));
 
         if ($due && $pause->overdue_notified_at === null) {
-            // Stamp first (write-ahead, like the pause row itself). The queue is
-            // `sync`, so a mail transport error surfaces right here; stamping
-            // afterwards would re-notify everyone on every ten-minute run.
-            $pause->update(['overdue_notified_at' => now()]);
+            // Claim the row atomically (write-ahead, like the pause row itself).
+            // The queue is `sync`, so a mail transport error surfaces right
+            // here; stamping afterwards would re-notify everyone on every
+            // ten-minute run. The WHERE overdue_notified_at IS NULL makes the
+            // claim itself the concurrency guard: if another run's command
+            // already stamped this row between our SELECT and this UPDATE,
+            // the affected-row count is 0 and we skip notifying.
+            $claimedAt = now();
+            $claimed = ProjectHardeningPause::whereKey($pause->id)
+                ->whereNull('overdue_notified_at')
+                ->update(['overdue_notified_at' => $claimedAt]) === 1;
 
-            $recipients = User::where('role', 'admin')->orWhere('is_admin', true)->get();
-            if ($pause->user) {
-                $recipients->push($pause->user);
-            }
+            if ($claimed) {
+                $pause->overdue_notified_at = $claimedAt;
 
-            foreach ($recipients->unique('id') as $recipient) {
-                try {
-                    $recipient->notify(new HardeningPauseOverdueNotification($project, $pause));
-                } catch (\Throwable $e) {
-                    Log::error("hardening:resume-expired could not notify user #{$recipient->id} about pause #{$pause->id}: {$e->getMessage()}");
+                $recipients = User::where('role', 'admin')->orWhere('is_admin', true)->get();
+                if ($pause->user) {
+                    $recipients->push($pause->user);
+                }
+
+                foreach ($recipients->unique('id') as $recipient) {
+                    try {
+                        $recipient->notify(new HardeningPauseOverdueNotification($project, $pause));
+                    } catch (\Throwable $e) {
+                        Log::error("hardening:resume-expired could not notify user #{$recipient->id} about pause #{$pause->id}: {$e->getMessage()}");
+                    }
                 }
             }
         }
