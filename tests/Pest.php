@@ -82,3 +82,45 @@ function hardeningUser(string $role, array $attrs = []): \App\Models\User
         'two_factor_confirmed_at' => now(),
     ], $attrs));
 }
+
+/**
+ * The plugin's `status` object (spec 2026-09-21, REST endpoints) with a
+ * chosen block_archives state.
+ */
+function hardeningPluginStatus(string $archivesState = 'on', ?int $pauseUntil = null, bool $pauseOverdue = false): array
+{
+    $rule = fn (string $state, bool $desired) => [
+        'state' => $state,
+        'desired' => $desired,
+        'unsupported_reason' => null,
+        'last_failure' => null,
+    ];
+
+    return [
+        'plugin_version' => '2.10.0',
+        'server' => 'Apache',
+        'rules' => [
+            'block_archives' => $rule($archivesState, true),
+            'block_debug_log' => $rule('off', false),
+            'block_uploads_php' => $rule('off', false),
+        ],
+        'pause_until' => $pauseUntil,
+        'pause_overdue' => $pauseOverdue,
+        'archive_attachments' => 0,
+        'last_result' => null,
+    ];
+}
+
+/**
+ * A full plugin hardening response body: top level, no `data` wrapper.
+ */
+function hardeningPluginBody(bool $success = true, ?string $reason = null, ?array $status = null, array $warnings = [], string $message = 'Applied and verified'): array
+{
+    return [
+        'success' => $success,
+        'reason' => $reason,
+        'message' => $message,
+        'warnings' => $warnings,
+        'status' => $status ?? hardeningPluginStatus(),
+    ];
+}
