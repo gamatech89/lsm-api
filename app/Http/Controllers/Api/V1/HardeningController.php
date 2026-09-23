@@ -9,6 +9,7 @@ use App\Services\HardeningResponseMapper;
 use App\Services\LsmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -94,6 +95,49 @@ class HardeningController extends Controller
     }
 
     /**
+     * Pause the archive rule for a download (15, 30 or 60 minutes).
+     */
+    public function pause(Project $project, Request $request): JsonResponse
+    {
+        Gate::authorize('pauseHardening', $project);
+
+        $validated = $request->validate([
+            'minutes' => 'required|integer|in:15,30,60',
+        ]);
+        $minutes = (int) $validated['minutes'];
+
+        // Write-ahead: the row exists before the plugin is called, so a pause
+        // whose response gets lost is still found by hardening:resume-expired.
+        $superseded = $this->closeOpenPauses($project, 'Superseded by a new pause');
+        $pause = ProjectHardeningPause::create([
+            'project_id' => $project->id,
+            'user_id' => auth()->id(),
+            'paused_until' => now()->addMinutes($minutes),
+        ]);
+
+        $lsm = LsmService::for($project);
+        $mapped = HardeningResponseMapper::map(
+            $lsm->hardeningRequest('POST', '/hardening/pause', ['minutes' => $minutes], self::POST_TIMEOUT)
+        );
+
+        if ($mapped['outcome'] === 'ok') {
+            $until = $mapped['body']['status']['pause_until'] ?? null;
+            if (is_int($until)) {
+                $pause->update(['paused_until' => Carbon::createFromTimestamp($until)]);
+            }
+        } elseif ($mapped['outcome'] !== 'unreachable' || !$lsm->isConfigured()) {
+            // The site answered and did not pause (success:false, old plugin, key
+            // rejected), or nothing was sent at all (no LSM key): drop the row and
+            // reopen whatever this call superseded.
+            $pause->delete();
+            ProjectHardeningPause::whereIn('id', $superseded)->update(['resumed_at' => null, 'note' => null]);
+        }
+        // unreachable: outcome unknown — the row stays and the backstop reconciles.
+
+        return $this->respond($project, $mapped);
+    }
+
+    /**
      * Send a mapped plugin result. Bodies that carry a plugin status (ok, busy,
      * failed) also get open_pause, pause_overdue and can.
      */
@@ -147,17 +191,23 @@ class HardeningController extends Controller
             return [];
         }
 
-        // Re-apply the open scope on the write: a row another request already
-        // closed or failed between the read above and this update must not be
-        // overwritten.
+        // Close one id at a time and keep only the ones this call actually
+        // closed: re-applying the open scope per row (rather than in one
+        // whereIn update) means two calls landing in the same wall-clock
+        // second can't misattribute a row the other one closed via a
+        // resumed_at-timestamp match.
         $closedAt = now();
-        ProjectHardeningPause::whereIn('id', $ids)
-            ->open()
-            ->update(['resumed_at' => $closedAt, 'note' => $note]);
+        $closed = [];
+        foreach ($ids as $id) {
+            $affected = ProjectHardeningPause::whereKey($id)
+                ->open()
+                ->update(['resumed_at' => $closedAt, 'note' => $note]);
 
-        return ProjectHardeningPause::whereIn('id', $ids)
-            ->where('resumed_at', $closedAt)
-            ->pluck('id')
-            ->all();
+            if ($affected === 1) {
+                $closed[] = $id;
+            }
+        }
+
+        return $closed;
     }
 }

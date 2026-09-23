@@ -290,6 +290,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             // Server hardening (.htaccess)
             Route::get('/hardening', [V1\HardeningController::class, 'show'])->name('hardening');
             Route::post('/hardening/rule', [V1\HardeningController::class, 'setRule'])->name('hardening.rule');
+            Route::post('/hardening/pause', [V1\HardeningController::class, 'pause'])->name('hardening.pause');
 
             // Security Scanning
             Route::post('/security-scan', [V1\SecurityScanController::class, 'scan'])->name('security-scan');
