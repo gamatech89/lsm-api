@@ -204,6 +204,23 @@ test('an open row is closed opportunistically only when the plugin confirms the 
     expect($pause->fresh()->note)->toBe('Closed from status: site no longer paused');
 });
 
+test('a status of on with pause_until still set does not close the row', function () {
+    fakeHardeningStatus(hardeningPluginStatus('on', now()->addMinutes(10)->timestamp));
+    $project = hardeningProject();
+    $pause = ProjectHardeningPause::factory()->create([
+        'project_id' => $project->id,
+        'paused_until' => now()->subMinutes(5),
+        'created_at' => now()->subMinutes(65),
+    ]);
+
+    $this->actingAs(hardeningUser('admin'))
+        ->getJson("/api/v1/projects/{$project->id}/lsm/hardening")
+        ->assertOk()
+        ->assertJsonPath('open_pause.id', $pause->id);
+
+    expect($pause->fresh()->resumed_at)->toBeNull();
+});
+
 test('a status other than a confirmed on does not close the row', function (string $state) {
     fakeHardeningStatus(hardeningPluginStatus($state));
     $project = hardeningProject();

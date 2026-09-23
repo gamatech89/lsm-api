@@ -39,8 +39,8 @@ class HardeningController extends Controller
             : null;
         $pluginOutdated = $result['http'] === 404;
 
-        // Opportunistic close: the plugin resumed on its own (or the rule was
-        // changed on the site) and the platform row is the only thing still open.
+        // Opportunistic close: the plugin resumed on its own and the platform
+        // row is the only thing still open.
         // Only a confirmed `on` proves the pause ended: mid-operation the plugin can report
         // `drift` (rule out of the file, pause_until not yet committed) — closing then would
         // leave a finisher-less host with no resumer at all.
@@ -92,10 +92,21 @@ class HardeningController extends Controller
 
         $ids = $query->pluck('id')->all();
 
-        if ($ids !== []) {
-            ProjectHardeningPause::whereIn('id', $ids)->update(['resumed_at' => now(), 'note' => $note]);
+        if ($ids === []) {
+            return [];
         }
 
-        return $ids;
+        // Re-apply the open scope on the write: a row another request already
+        // closed or failed between the read above and this update must not be
+        // overwritten.
+        $closedAt = now();
+        ProjectHardeningPause::whereIn('id', $ids)
+            ->open()
+            ->update(['resumed_at' => $closedAt, 'note' => $note]);
+
+        return ProjectHardeningPause::whereIn('id', $ids)
+            ->where('resumed_at', $closedAt)
+            ->pluck('id')
+            ->all();
     }
 }
