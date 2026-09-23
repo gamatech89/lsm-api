@@ -57,3 +57,15 @@ function actingWithScopes(\App\Models\User $user, array $scopes): \App\Models\Us
 
     return $user->withAccessToken($token->accessToken);
 }
+
+/**
+ * A project the LSM plugin counts as "configured" (url + health_check_secret),
+ * for the .htaccess hardening tests. ProjectFactory sets no secret on its own.
+ */
+function hardeningProject(array $attrs = []): \App\Models\Project
+{
+    return \App\Models\Project::factory()->create(array_merge([
+        'url' => 'https://client.example.com',
+        'health_check_secret' => 'SECRETKEY123',
+    ], $attrs));
+}
