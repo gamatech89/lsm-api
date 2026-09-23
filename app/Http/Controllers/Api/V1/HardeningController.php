@@ -8,6 +8,7 @@ use App\Models\ProjectHardeningPause;
 use App\Services\HardeningResponseMapper;
 use App\Services\LsmService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -23,6 +24,11 @@ class HardeningController extends Controller
      * is still running (the POST timeout is 120 s), so status reads leave it alone.
      */
     private const IN_FLIGHT_SECONDS = 180;
+
+    private const RULES = ['block_archives', 'block_debug_log', 'block_uploads_php'];
+
+    /** The plugin's apply procedure self-tests over HTTP; worst case is about 60 s. */
+    private const POST_TIMEOUT = 120;
 
     /**
      * Hardening status for the Security panel. Always answers 200 so an old
@@ -55,6 +61,51 @@ class HardeningController extends Controller
             'min_version' => HardeningResponseMapper::MIN_PLUGIN_VERSION,
             'status' => $status,
         ], $this->platformState($project, $status)));
+    }
+
+    /**
+     * Turn one rule on or off.
+     */
+    public function setRule(Project $project, Request $request): JsonResponse
+    {
+        // The ability depends on the direction, so authorize on the cast bool
+        // BEFORE validating: a missing or garbage `enabled` counts as a disable
+        // (fail closed) — a non-admin gets 403, an admin gets the 422 below.
+        $enabled = $request->boolean('enabled');
+        Gate::authorize($enabled ? 'enableHardening' : 'disableHardening', $project);
+
+        $validated = $request->validate([
+            'rule' => 'required|string|in:' . implode(',', self::RULES),
+            'enabled' => 'required|boolean',
+        ]);
+
+        $mapped = HardeningResponseMapper::map(
+            LsmService::for($project)->hardeningRequest('POST', '/hardening/rule', [
+                'rule' => $validated['rule'],
+                'enabled' => $enabled,
+            ], self::POST_TIMEOUT)
+        );
+
+        if ($mapped['outcome'] === 'ok' && $validated['rule'] === 'block_archives' && !$enabled) {
+            $this->closeOpenPauses($project, 'Closed: block_archives turned off');
+        }
+
+        return $this->respond($project, $mapped);
+    }
+
+    /**
+     * Send a mapped plugin result. Bodies that carry a plugin status (ok, busy,
+     * failed) also get open_pause, pause_overdue and can.
+     */
+    private function respond(Project $project, array $mapped): JsonResponse
+    {
+        $body = $mapped['body'];
+
+        if (array_key_exists('status', $body)) {
+            $body = array_merge($body, $this->platformState($project, $body['status']));
+        }
+
+        return response()->json($body, $mapped['code']);
     }
 
     /**
