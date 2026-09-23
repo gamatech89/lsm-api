@@ -138,6 +138,24 @@ class HardeningController extends Controller
     }
 
     /**
+     * End a pause early ("Re-enable now"). A no-op on the site when nothing is paused.
+     */
+    public function resume(Project $project): JsonResponse
+    {
+        Gate::authorize('pauseHardening', $project);
+
+        $mapped = HardeningResponseMapper::map(
+            LsmService::for($project)->hardeningRequest('POST', '/hardening/resume', [], self::POST_TIMEOUT)
+        );
+
+        if ($mapped['outcome'] === 'ok') {
+            $this->closeOpenPauses($project, 'Closed: resumed from the platform');
+        }
+
+        return $this->respond($project, $mapped);
+    }
+
+    /**
      * Send a mapped plugin result. Bodies that carry a plugin status (ok, busy,
      * failed) also get open_pause, pause_overdue and can.
      */
