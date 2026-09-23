@@ -230,3 +230,22 @@ Schedule::command('model:prune', ['--model' => \App\Models\UptimeCheck::class])
     ->timezone('Europe/Berlin')
     ->onOneServer()
     ->name('uptime-checks-prune');
+
+/*
+|--------------------------------------------------------------------------
+| Hardening Pause Backstop
+|--------------------------------------------------------------------------
+|
+| Re-enables the .htaccess archive rule on sites whose "pause for download"
+| has expired and that did not resume on their own. The mutex expires after
+| 15 minutes instead of the 24 h default: a stuck default mutex kept
+| sites:check-uptime from running for three days in August 2026.
+|
+*/
+
+Schedule::command('hardening:resume-expired')
+    ->everyTenMinutes()
+    ->withoutOverlapping(15)
+    ->runInBackground()
+    ->name('hardening-resume-expired')
+    ->onOneServer();
