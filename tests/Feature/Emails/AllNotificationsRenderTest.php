@@ -9,6 +9,7 @@
 use App\Models\Backup;
 use App\Models\Credential;
 use App\Models\Project;
+use App\Models\ProjectHardeningPause;
 use App\Models\SecurityScan;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
@@ -18,6 +19,7 @@ use App\Notifications\BackupCompletedNotification;
 use App\Notifications\BackupFailedNotification;
 use App\Notifications\CredentialAccessGrantedNotification;
 use App\Notifications\DomainExpiringNotification;
+use App\Notifications\HardeningPauseOverdueNotification;
 use App\Notifications\MalwareDetectedNotification;
 use App\Notifications\ProjectAssignedNotification;
 use App\Notifications\ProjectStatusChangedNotification;
@@ -49,7 +51,7 @@ beforeEach(function () {
 /**
  * Notification classes deliberately NOT in the dataset below, and why.
  * (Currently empty — every notification in app/Notifications/ has a 'mail' channel
- * and a toMail() that returns a MailMessage, so all 20 are covered.)
+ * and a toMail() that returns a MailMessage, so all 21 are covered.)
  *
  * If a future notification is database-only (its via() never includes 'mail', or it
  * has no toMail()), add its short class name here with a one-line reason so the
@@ -112,6 +114,18 @@ function notificationDataset(): array
             ]);
 
             return new DomainExpiringNotification($project, '2026-08-01', 5);
+        },
+
+        'HardeningPauseOverdueNotification' => function () {
+            $project = Project::factory()->make(['id' => 9118, 'name' => 'Sigma']);
+            $pause = ProjectHardeningPause::factory()->make([
+                'id' => 1,
+                'project_id' => 9118,
+                'user_id' => null,
+                'paused_until' => now()->subMinutes(45),
+            ]);
+
+            return new HardeningPauseOverdueNotification($project, $pause);
         },
 
         'MalwareDetectedNotification' => function () {

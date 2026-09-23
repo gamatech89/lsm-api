@@ -287,6 +287,18 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/security-headers', [V1\LsmController::class, 'getSecurityHeaders'])->name('security-headers');
             Route::get('/security-headers/snippets', [V1\LsmController::class, 'getSecurityHeaderSnippets'])->name('security-headers.snippets');
 
+            // Server hardening (.htaccess)
+            Route::get('/hardening', [V1\HardeningController::class, 'show'])->name('hardening');
+            Route::post('/hardening/rule', [V1\HardeningController::class, 'setRule'])
+                ->middleware('throttle:12,1,hardening')
+                ->name('hardening.rule');
+            Route::post('/hardening/pause', [V1\HardeningController::class, 'pause'])
+                ->middleware('throttle:12,1,hardening')
+                ->name('hardening.pause');
+            Route::post('/hardening/resume', [V1\HardeningController::class, 'resume'])
+                ->middleware('throttle:12,1,hardening')
+                ->name('hardening.resume');
+
             // Security Scanning
             Route::post('/security-scan', [V1\SecurityScanController::class, 'scan'])->name('security-scan');
             Route::get('/security-scans', [V1\SecurityScanController::class, 'index'])->name('security-scans.index');

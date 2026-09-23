@@ -45,7 +45,7 @@
 - **Never** route a hardening call through `LsmService::get()` / `post()` / `handleResponse()`, never use the `role:admin` middleware (`CheckRole` ignores `is_admin`), never assert admin rights with `new ProjectPolicy` (that skips `before()`).
 - **Tests run on SQLite `:memory:`** (`phpunit.xml:26-27`): string columns instead of enums, no raw SQL, date comparisons through Eloquent/Carbon. `phpunit.xml` pins `MANAGERS_VIEW_ALL_PROJECTS=true` (forced, line 42) — the "unassigned manager GET 200" tests depend on it; `MFA_ENFORCED_ROLES=""` is **not** forced (line 35), so test users are created with `two_factor_confirmed_at`.
 - **Queue is `sync` in production** (`routes/console.php:144-146`): the command does its work inline, no queued jobs.
-- **Baseline suite: 346 passed, 2 skipped, 0 failed** (measured on `e1ff102`). After Task 13 it must be **513 passed, 2 skipped**. Run the whole suite with `php -d memory_limit=1G vendor/bin/pest` — plain `php artisan test` without a path runs out of the 128 MB CLI memory limit on this machine even on the untouched baseline. Single files and the `tests/Feature/Hardening` directory run fine with `php artisan test <path>`.
+- **Baseline suite: 346 passed, 2 skipped, 0 failed** (measured on `e1ff102`). After Task 13 it must be **516 passed, 2 skipped** (513 planned + 1 review-mandated test in Task 5 + 2 extra audit-outcome tests in Task 13). Run the whole suite with `php -d memory_limit=1G vendor/bin/pest` — plain `php artisan test` without a path runs out of the 128 MB CLI memory limit on this machine even on the untouched baseline. Single files and the `tests/Feature/Hardening` directory run fine with `php artisan test <path>`.
 - **Rollout order:** plugin 2.10.0 first (inert: everything off), then API, then web. This plan executes no deploy: **Tasks 1-13 are the whole job.** Appendix A is a runbook for the human who deploys — it is not a task, and no agent executes, verifies or is dispatched with any part of it.
 
 ---
@@ -3808,7 +3808,7 @@ Expected: PASS, 166 tests (111 after Task 9 + 4 notification + 26 command + 1 sc
 - [ ] **Step 8: Run the whole suite**
 
 Run: `cd /Users/bmarkovic/Documents/Projects/LSMPlatform/lsm-api && php -d memory_limit=1G vendor/bin/pest`
-Expected: `Tests: 2 skipped, 513 passed`. Zero failures — the baseline was 346 passed, 2 skipped; this feature adds 166 tests plus one dataset row in `AllNotificationsRenderTest`. Any red test is a regression from this branch: stop and fix it.
+Expected: `Tests: 2 skipped, 516 passed` (513 planned + 1 review-mandated test in Task 5 + 2 extra audit-outcome tests in Task 13). Zero failures — the baseline was 346 passed, 2 skipped; this feature adds 166 tests plus one dataset row in `AllNotificationsRenderTest`. Any red test is a regression from this branch: stop and fix it.
 
 - [ ] **Step 9: Commit**
 
@@ -3835,8 +3835,10 @@ This appendix is reference material for the person who deploys. It is not part o
 
 **Order across repos:** plugin 2.10.0 first (inert: everything off), then this API, then web. Until a site's plugin is updated, its panel shows the quiet `plugin_outdated` state — that is expected, not an error.
 
+**Pre-flight:** Confirm the API vhost and any proxy/CDN in front of it allow requests of about 130 s: the hardening POSTs wait up to 120 s for the plugin. If a pause POST is cut off early the write-ahead row still protects the site, but the audit line and the `paused_until` update are lost and the SPA shows a 504.
+
 1. Confirm plugin `2.10.0` is released (GitHub release of `lsm-wp` with the zip attached) before deploying the API. The API is harmless without it, but nothing can be verified end to end.
-2. On your machine, in `lsm-api`: make sure `git status` shows nothing but the untracked plan documents on `feature/htaccess-hardening`, run `php -d memory_limit=1G vendor/bin/pest` once more (expect `2 skipped, 513 passed`), then merge into `main` and `git push origin main` (deploys are `git pull` on the server — never edit files there).
+2. On your machine, in `lsm-api`: make sure `git status` on `feature/htaccess-hardening` shows a clean working tree (the plan documents are committed, nothing left untracked or modified), run `php -d memory_limit=1G vendor/bin/pest` once more (expect `2 skipped, 516 passed`), then merge into `main` and `git push origin main` (deploys are `git pull` on the server — never edit files there).
 3. `ssh wartung-api`, `cd` into the API directory named in the deploy workflow document, `git pull origin main`.
 4. `composer install --no-dev --optimize-autoloader`
 5. `composer dump-autoload -o` — **before** migrating. New classes (`ProjectHardeningPause`, `HardeningController`, `HardeningResponseMapper`, the command) must be in the optimized classmap first; this ordering is the gotcha recorded from the 5 August deploy, which took production down.

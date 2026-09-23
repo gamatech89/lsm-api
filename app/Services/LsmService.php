@@ -492,6 +492,46 @@ class LsmService
         return $this->get('/security/headers/snippets');
     }
 
+    /**
+     * Raw call to the plugin's /hardening/* endpoints (plugin 2.10.0+).
+     *
+     * Deliberately NOT routed through handleResponse(): the caller needs the
+     * HTTP status (404 = plugin too old, 401/403 = key rejected) and the
+     * untouched `success` flag. `http` is null when there was no response at
+     * all (not configured, timeout, DNS, connection refused).
+     *
+     * @return array{http: int|null, json: array|null}
+     */
+    public function hardeningRequest(string $method, string $endpoint, array $data = [], int $timeout = 30): array
+    {
+        if (!$this->isConfigured()) {
+            return ['http' => null, 'json' => null];
+        }
+
+        try {
+            $request = Http::timeout($timeout)
+                ->withHeaders(['X-LSM-Key' => $this->apiKey])
+                // strict: a 301/302 (http -> https, non-www -> www) must replay a POST
+                // as a POST. Guzzle's default replays it as a GET, WordPress answers
+                // that with 404 rest_no_route, and the site would read as plugin_outdated.
+                ->withOptions(['allow_redirects' => ['strict' => true]]);
+
+            if (strtoupper($method) === 'GET') {
+                // One host caches plugin REST GETs for 28 days — bust it on every call.
+                $response = $request->get($this->baseUrl . $endpoint, array_merge($data, ['_' => sprintf('%.6F', microtime(true))]));
+            } else {
+                $response = $request->asJson()->post($this->baseUrl . $endpoint, $data);
+            }
+
+            $json = $response->json();
+
+            return ['http' => $response->status(), 'json' => is_array($json) ? $json : null];
+        } catch (\Exception $e) {
+            Log::error("LSM API Error ({$endpoint}): {$e->getMessage()}");
+            return ['http' => null, 'json' => null];
+        }
+    }
+
     // =========================================================================
     // SECURITY SCANNING
     // =========================================================================
