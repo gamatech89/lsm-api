@@ -94,4 +94,21 @@ class HardeningResponseMapper
             ],
         ];
     }
+
+    /**
+     * The `outcome` string for the 'hardening' audit log line: `ok` for a
+     * successful call, the plugin's own `reason` for a plugin-side failure
+     * (busy / a rule-specific reason), or the platform outcome itself for
+     * plugin_outdated / unauthorized / unreachable.
+     *
+     * @param  array{outcome: string, code: int, body: array}  $mapped
+     */
+    public static function auditOutcome(array $mapped): string
+    {
+        if ($mapped['outcome'] === 'busy' || $mapped['outcome'] === 'failed') {
+            return $mapped['body']['reason'] ?? $mapped['outcome'];
+        }
+
+        return $mapped['outcome'];
+    }
 }
