@@ -69,3 +69,16 @@ function hardeningProject(array $attrs = []): \App\Models\Project
         'health_check_secret' => 'SECRETKEY123',
     ], $attrs));
 }
+
+/**
+ * A user for the hardening permission tests. two_factor_confirmed_at keeps
+ * EnsureTwoFactorEnrolled out of the way even when a developer's shell exports
+ * MFA_ENFORCED_ROLES (phpunit.xml does not force that variable).
+ */
+function hardeningUser(string $role, array $attrs = []): \App\Models\User
+{
+    return \App\Models\User::factory()->create(array_merge([
+        'role' => $role,
+        'two_factor_confirmed_at' => now(),
+    ], $attrs));
+}

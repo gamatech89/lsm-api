@@ -145,4 +145,28 @@ class ProjectPolicy
     {
         return $user->role === 'manager' && $this->managesProject($user, $project);
     }
+
+    /**
+     * Pause / resume the .htaccess archive rule: anyone who can update the project.
+     */
+    public function pauseHardening(User $user, Project $project): bool
+    {
+        return $this->update($user, $project);
+    }
+
+    /**
+     * Turn a hardening rule on (or adopt a manual one): managers of the project.
+     */
+    public function enableHardening(User $user, Project $project): bool
+    {
+        return $user->role === 'manager' && $this->managesProject($user, $project);
+    }
+
+    /**
+     * Turn a hardening rule off.
+     */
+    public function disableHardening(User $user, Project $project): bool
+    {
+        return false; // Only admins via before()
+    }
 }
