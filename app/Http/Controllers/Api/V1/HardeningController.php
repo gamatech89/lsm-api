@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Managed .htaccess hardening (plugin 2.10.0+).
@@ -91,6 +92,8 @@ class HardeningController extends Controller
             $this->closeOpenPauses($project, 'Closed: block_archives turned off');
         }
 
+        $this->logAction($project, $enabled ? 'enable' : 'disable', $validated['rule'], $mapped);
+
         return $this->respond($project, $mapped);
     }
 
@@ -134,6 +137,8 @@ class HardeningController extends Controller
         }
         // unreachable: outcome unknown — the row stays and the backstop reconciles.
 
+        $this->logAction($project, 'pause', 'block_archives', $mapped);
+
         return $this->respond($project, $mapped);
     }
 
@@ -152,6 +157,8 @@ class HardeningController extends Controller
             $this->closeOpenPauses($project, 'Closed: resumed from the platform');
         }
 
+        $this->logAction($project, 'resume', 'block_archives', $mapped);
+
         return $this->respond($project, $mapped);
     }
 
@@ -168,6 +175,21 @@ class HardeningController extends Controller
         }
 
         return response()->json($body, $mapped['code']);
+    }
+
+    /**
+     * Durable server-side record of who changed what. The plugin's own log is a
+     * 200-entry ring buffer on the site and carries no platform identity.
+     */
+    private function logAction(Project $project, string $action, string $rule, array $mapped): void
+    {
+        Log::info('hardening', [
+            'user_id' => auth()->id(),
+            'project_id' => $project->id,
+            'action' => $action,
+            'rule' => $rule,
+            'outcome' => HardeningResponseMapper::auditOutcome($mapped),
+        ]);
     }
 
     /**
