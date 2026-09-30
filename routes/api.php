@@ -81,8 +81,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::post('/review-share/{token}/annotations/{siteReviewAnnotation}/screenshot', [V1\SiteReviewAnnotationController::class, 'screenshotShare'])->name('review-share.annotations.screenshot');
 
     // WEBHOOKS (Public - authenticated via API key in payload)
+    // Intake from the plugin is behind PLUGIN_TICKETING_ENABLED (config/ticketing.php) — 503 when off.
     Route::post('/webhooks/support-ticket', [V1\SupportTicketController::class, 'receiveFromPlugin'])
-        ->middleware('throttle:30,1')
+        ->middleware(['throttle:30,1', \App\Http\Middleware\EnsurePluginTicketingEnabled::class])
         ->name('webhooks.support-ticket');
 
     // PLUGIN TICKETING (authenticated via X-LSM-Key header)
@@ -91,11 +92,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->name('plugin.support-tickets.')
         ->group(function () {
             Route::get('/', [V1\PluginTicketController::class, 'index'])->name('index');
-            Route::post('/', [V1\PluginTicketController::class, 'store'])->name('store');
+            Route::post('/', [V1\PluginTicketController::class, 'store'])
+                ->middleware(\App\Http\Middleware\EnsurePluginTicketingEnabled::class)->name('store');
             Route::get('/attachments/{attachment}', [V1\PluginTicketController::class, 'downloadAttachment'])
                 ->name('attachments.download');
             Route::get('/{supportTicket}', [V1\PluginTicketController::class, 'show'])->name('show');
-            Route::post('/{supportTicket}/messages', [V1\PluginTicketController::class, 'storeMessage'])->name('messages.store');
+            Route::post('/{supportTicket}/messages', [V1\PluginTicketController::class, 'storeMessage'])
+                ->middleware(\App\Http\Middleware\EnsurePluginTicketingEnabled::class)->name('messages.store');
         });
 
     // WP PLUGIN MALWARE SCANNER (authenticated via X-LSM-Key header)
