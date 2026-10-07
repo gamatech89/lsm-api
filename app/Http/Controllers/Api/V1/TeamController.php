@@ -90,6 +90,7 @@ class TeamController extends Controller
         $plainPassword = $validated['password'];
         $validated['password'] = Hash::make($plainPassword);
         $validated['email_verified_at'] = now(); // Auto-verify for admin-created users
+        $validated['two_factor_email_enabled'] = true; // Email 2FA on from day one — no enrollment step
 
         $user = User::create($validated);
 
