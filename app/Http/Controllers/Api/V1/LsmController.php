@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SyncWpAccountsJob;
 use App\Models\Project;
 use App\Services\LsmService;
+use App\Services\PluginReleaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -589,59 +591,27 @@ class LsmController extends Controller
         return response()->json($result ?? ['error' => 'Failed to execute emergency recovery']);
     }
     /**
-     * Download the LSM plugin as a zip file.
-     * 
-     * @param Request $request
-     * @param Project $project
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * Download the LSM plugin zip attached to the latest GitHub release.
+     *
+     * Served through the API rather than linking to GitHub so access stays
+     * behind the project's view permission and the SPA gets a readable error.
      */
-    public function downloadPlugin(Request $request, Project $project)
+    public function downloadPlugin(Project $project, PluginReleaseService $releases): Response|JsonResponse
     {
         Gate::authorize('view', $project);
 
-        // Path to the plugin directory
-        $pluginPath = base_path('wordpress-plugin/landeseiten-maintenance');
-        $zipFileName = 'landeseiten-maintenance.zip';
-        $zipPath = storage_path('app/temp/' . $zipFileName);
-        
-        // Ensure temp directory exists
-        if (!file_exists(dirname($zipPath))) {
-            mkdir(dirname($zipPath), 0755, true);
+        $zip = $releases->latestZip();
+
+        if ($zip === null) {
+            return response()->json([
+                'message' => 'Could not fetch the plugin from GitHub. Please try again in a moment.',
+            ], 502);
         }
 
-        // Initialize ZipArchive
-        $zip = new \ZipArchive();
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === TRUE) {
-            
-            // Create recursive directory iterator
-            $files = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($pluginPath),
-                \RecursiveIteratorIterator::LEAVES_ONLY
-            );
-
-            foreach ($files as $name => $file) {
-                // Skip directories (they would be added automatically)
-                if (!$file->isDir()) {
-                    // Get real and relative path for current file
-                    $filePath = $file->getRealPath();
-                    $relativePath = 'landeseiten-maintenance/' . substr($filePath, strlen($pluginPath) + 1);
-
-                    // Skip git files or DS_Store
-                    if (strpos($filePath, '.git') !== false || strpos($filePath, '.DS_Store') !== false) {
-                        continue;
-                    }
-
-                    // Add current file to archive
-                    $zip->addFile($filePath, $relativePath);
-                }
-            }
-
-            // Close and save archive
-            $zip->close();
-        }
-
-        // Return the file as download
-        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+        return response($zip, 200, [
+            'Content-Type' => 'application/zip',
+            'Content-Disposition' => 'attachment; filename="landeseiten-maintenance.zip"',
+        ]);
     }
 
     // ================================================================
