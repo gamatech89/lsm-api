@@ -444,6 +444,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::put('/availability/{availability}', [V1\AvailabilityController::class, 'update'])->name('availability.update');
         Route::delete('/availability/{availability}', [V1\AvailabilityController::class, 'destroy'])->name('availability.destroy');
 
+        // CEO roadmap page (wartung-ls.com/roadmap): admins and managers get its password,
+        // so the page opens for them without typing it. Role check is in the controller
+        // (it also honours the is_admin flag, which the role middleware ignores).
+        Route::get('/roadmap/key', [V1\RoadmapController::class, 'key'])->name('roadmap.key');
+
         // -------------------------------------------------
         // TEAM MANAGEMENT
         // -------------------------------------------------
