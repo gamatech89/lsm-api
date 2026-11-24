@@ -55,4 +55,10 @@ return [
         'key' => env('PDF_SERVICE_KEY', 'lsm-gdpr-audit-2026-secure-key'),
     ],
 
+    // Password of the encrypted CEO roadmap page (wartung-ls.com/roadmap). Logged-in admins
+    // and managers get it from GET /api/v1/roadmap/key; unset = the endpoint answers 404.
+    'roadmap' => [
+        'password' => env('ROADMAP_PASSWORD'),
+    ],
+
 ];
